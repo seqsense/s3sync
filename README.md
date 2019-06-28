@@ -4,7 +4,7 @@
 
 # Usage
 
-```
+```go
 import "github.com/seqsense/s3sync"
 
 func main() {
