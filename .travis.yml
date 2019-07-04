@@ -1,0 +1,26 @@
+language: go
+
+go:
+  - 1.12.x
+
+services:
+  - docker
+
+env:
+  global:
+    - GO111MODULE=on
+      # These dummy credentials are necessary for running tests against
+      # localstack s3 service
+    - AWS_ACCESS_KEY_ID=foo
+    - AWS_SECRET_ACCESS_KEY=bar
+
+before_install:
+  - sudo pip install awscli
+    # Start mock s3 service
+  - docker run -d -p 4572:4572 -e SERVICES=s3 localstack/localstack
+  - sleep 10
+    # Set up fixture S3 files
+  - make fixture
+
+script:
+  - make cover # run test with coverage
