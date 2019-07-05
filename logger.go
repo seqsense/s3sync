@@ -13,17 +13,17 @@ type LoggerIF interface {
 }
 
 // Logger is the logger instance.
-var Logger LoggerIF
+var logger LoggerIF
 
-// SetLogger Sets the logger.
-func SetLogger(logger LoggerIF) {
-	Logger = logger
+// SetLogger sets the logger.
+func SetLogger(l LoggerIF) {
+	logger = l
 }
 
 func println(v ...interface{}) {
-	if Logger == nil {
+	if logger == nil {
 		log.Println(v...)
 		return
 	}
-	Logger.Log(v...)
+	logger.Log(v...)
 }

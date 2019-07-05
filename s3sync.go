@@ -149,9 +149,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 
 	println("Downloading", file.name, "to", targetFilename)
 
-	err := os.MkdirAll(targetDir, 0755)
-
-	if err != nil {
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
 	}
 
@@ -229,14 +227,12 @@ func listLocalFiles(basePath string) chan *fileInfo {
 	go func() {
 		defer close(c)
 
-		err := os.MkdirAll(basePath, 0755)
-		if err != nil {
-			sendErrorInfoToChannel(c, err)
-			return
-		}
-
 		stat, err := os.Stat(basePath)
-		if err != nil {
+		if os.IsNotExist(err) {
+			// The path doesn't exist.
+			// Returns and closes the channel without sending any.
+			return
+		} else if err != nil {
 			sendErrorInfoToChannel(c, err)
 			return
 		}
