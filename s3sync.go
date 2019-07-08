@@ -159,6 +159,8 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		return err
 	}
 
+	defer writer.Close()
+
 	_, err = s3manager.NewDownloaderWithClient(m.s3).Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(filepath.Join(sourcePath.bucketPrefix, file.name)),

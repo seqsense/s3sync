@@ -77,8 +77,8 @@ func TestPartialS3sync(t *testing.T) {
 	}
 
 	syncCount := 0
-	SetLogger(createLoggerWithLogFunc(func(v...interface{}){
-		syncCount++
+	SetLogger(createLoggerWithLogFunc(func(v ...interface{}) {
+		syncCount++ // This function is called once per one download
 	}))
 
 	if New(getSession()).Sync("s3://example-bucket", temp) != nil {
@@ -92,7 +92,6 @@ func TestPartialS3sync(t *testing.T) {
 	syncCount = 0
 
 	os.RemoveAll(filepath.Join(temp, "foo"))
-
 
 	if New(getSession()).Sync("s3://example-bucket", temp) != nil {
 		t.Fatal("Sync should be successful")
@@ -109,8 +108,8 @@ func TestPartialS3sync(t *testing.T) {
 }
 
 func getSession() *session.Session {
-	sess, _ :=session.NewSession(&aws.Config{
-		Region: aws.String("ap-northeast-1"),
+	sess, _ := session.NewSession(&aws.Config{
+		Region:           aws.String("ap-northeast-1"),
 		S3ForcePathStyle: aws.Bool(true),
 		Endpoint:         aws.String("http://localhost:4572"),
 	})
@@ -118,16 +117,16 @@ func getSession() *session.Session {
 }
 
 type dummyLogger struct {
-	log func (...interface{})
+	log func(...interface{})
 }
 
-func (d *dummyLogger) Log(v...interface{}) {
+func (d *dummyLogger) Log(v ...interface{}) {
 	d.log(v...)
 }
-func (d *dummyLogger) Logf(format string, v...interface{}) {
+func (d *dummyLogger) Logf(format string, v ...interface{}) {
 }
 
-func createLoggerWithLogFunc(log func(v...interface{})) LoggerIF {
+func createLoggerWithLogFunc(log func(v ...interface{})) LoggerIF {
 	return &dummyLogger{log: log}
 }
 
