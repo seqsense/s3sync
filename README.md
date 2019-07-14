@@ -39,3 +39,7 @@ s3sync.SetLogger(&CustomLogger{})
 ```
 
 The logger needs to implement `Log` and `Logf` methods. See the godoc for details.
+
+# License
+
+Apache 2.0 License. See [LICENSE](https://github.com/seqsense/s3sync/blob/master/LICENSE).
