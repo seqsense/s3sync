@@ -3,5 +3,18 @@
         "config:base",
         "schedule:nonOfficeHours"
     ],
+    "postUpdateOptions": [
+        "gomodTidy"
+    ],
+    "packageRules": [
+        {
+            "packagePatterns": [
+                "^golang.org/x/"
+            ],
+            "schedule": [
+                "on the first day of the month"
+            ]
+        }
+    ],
     "timezone": "Asia/Tokyo"
 }
