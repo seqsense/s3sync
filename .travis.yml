@@ -19,7 +19,7 @@ before_install:
   - sudo pip install awscli
     # Start mock s3 service
   - docker run -d -p 4572:4572 -e SERVICES=s3 localstack/localstack
-  - sleep 10
+  - sleep 15
     # Set up fixture S3 files
   - make fixture
 
