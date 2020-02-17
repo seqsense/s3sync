@@ -1,7 +1,7 @@
 {
     "extends": [
         "config:base",
-        "schedule:nonOfficeHours"
+        "schedule:weekends"
     ],
     "postUpdateOptions": [
         "gomodTidy"
