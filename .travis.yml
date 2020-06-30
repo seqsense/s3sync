@@ -9,7 +9,6 @@ services:
 
 env:
   global:
-    - GO111MODULE=on
       # These dummy credentials are necessary for running tests against
       # localstack s3 service
     - AWS_ACCESS_KEY_ID=foo
