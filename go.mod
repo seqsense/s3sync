@@ -1,5 +1,5 @@
 module github.com/seqsense/s3sync
 
-go 1.13
+go 1.14
 
 require github.com/aws/aws-sdk-go v1.32.11
