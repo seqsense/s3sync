@@ -1,15 +1,14 @@
 language: go
 
 go:
-  - 1.12.x
   - 1.13.x
+  - 1.14.x
 
 services:
   - docker
 
 env:
   global:
-    - GO111MODULE=on
       # These dummy credentials are necessary for running tests against
       # localstack s3 service
     - AWS_ACCESS_KEY_ID=foo
