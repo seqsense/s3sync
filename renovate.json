@@ -19,8 +19,10 @@
             "packagePatterns": [
                 "^github.com/aws/aws-sdk-go"
             ],
-            "updateTypes": ["patch"],
-            "automerge": true
+            "separateMinorPatch": true,
+            "patch": {
+                "automerge": true
+            }
         }
     ],
     "timezone": "Asia/Tokyo"
