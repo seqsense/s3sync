@@ -16,10 +16,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 const dummyFilename = "README.md"
@@ -31,46 +33,106 @@ func TestS3syncNotImplemented(t *testing.T) {
 		t.Fatal("local to local sync is not supported")
 	}
 
-	if err := m.Sync("foo", "s3://bar"); err == nil {
-		t.Fatal("local to s3 sync is not implemented yet")
-	}
-
 	if err := m.Sync("s3://foo", "s3://bar"); err == nil {
 		t.Fatal("s3 to s3 sync is not implemented yet")
 	}
 }
 
 func TestS3sync(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
-	if err != nil {
-		t.Fatal("Failed to read", dummyFilename)
-	}
+	t.Run("Download", func(t *testing.T) {
+		data, err := ioutil.ReadFile(dummyFilename)
+		if err != nil {
+			t.Fatal("Failed to read", dummyFilename)
+		}
 
-	expectedFileSize := len(data)
+		expectedFileSize := len(data)
 
-	temp, err := ioutil.TempDir("", "s3synctest")
-	defer os.RemoveAll(temp)
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
 
-	if err != nil {
-		t.Fatal("Failed to create temp dir")
-	}
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
 
-	// The dummy s3 bucket has following files.
-	//
-	// s3://example-bucket/
-	// ├── README.md
-	// ├── bar
-	// │   └── baz
-	// │       └── README.md
-	// └── foo
-	//     └── README.md
-	if New(getSession()).Sync("s3://example-bucket", temp) != nil {
-		t.Fatal("Sync should be successful")
-	}
+		// The dummy s3 bucket has following files.
+		//
+		// s3://example-bucket/
+		// ├── README.md
+		// ├── bar
+		// │   └── baz
+		// │       └── README.md
+		// └── foo
+		//     └── README.md
+		if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
 
-	fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
-	fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
-	fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
+		fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
+		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
+		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
+	})
+	t.Run("Upload", func(t *testing.T) {
+		const expectedFileSize = 100
+
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		for _, dir := range []string{
+			filepath.Join(temp, "foo"), filepath.Join(temp, "bar", "baz"),
+		} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal("Failed to mkdir", err)
+			}
+		}
+
+		for _, file := range []string{
+			filepath.Join(temp, dummyFilename),
+			filepath.Join(temp, "foo", dummyFilename),
+			filepath.Join(temp, "bar", "baz", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, expectedFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		if err := New(getSession()).Sync(temp, "s3://example-bucket-upload"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		svc := s3.New(session.New(&aws.Config{
+			Region:           aws.String("test"),
+			Endpoint:         aws.String("http://localhost:4572"),
+			S3ForcePathStyle: aws.Bool(true),
+		}))
+
+		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket:  aws.String("example-bucket-upload"),
+			MaxKeys: aws.Int64(10),
+		})
+		if err != nil {
+			t.Fatal("ListObjects failed", err)
+		}
+		if n := len(result.Contents); n != 3 {
+			t.Fatalf("Number of the files should be 3 (result: %s)", result)
+		}
+		var keys []string
+		for _, obj := range result.Contents {
+			if int(*obj.Size) != expectedFileSize {
+				t.Errorf("Object size should be %d, actual %d", expectedFileSize, obj.Size)
+			}
+			keys = append(keys, *obj.Key)
+		}
+		sort.Strings(keys)
+		if keys[0] != "README.md" ||
+			keys[1] != "bar/baz/README.md" ||
+			keys[2] != "foo/README.md" {
+			t.Error("Unexpected keys", keys)
+		}
+	})
 }
 
 func TestPartialS3sync(t *testing.T) {
@@ -93,8 +155,8 @@ func TestPartialS3sync(t *testing.T) {
 		syncCount++ // This function is called once per one download
 	}))
 
-	if New(getSession()).Sync("s3://example-bucket", temp) != nil {
-		t.Fatal("Sync should be successful")
+	if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+		t.Fatal("Sync should be successful", err)
 	}
 
 	if syncCount != 3 {
