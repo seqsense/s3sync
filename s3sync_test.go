@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"sync/atomic"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -150,20 +151,20 @@ func TestPartialS3sync(t *testing.T) {
 		t.Fatal("Failed to create temp dir")
 	}
 
-	syncCount := 0
+	var syncCount uint32
 	SetLogger(createLoggerWithLogFunc(func(v ...interface{}) {
-		syncCount++ // This function is called once per one download
+		atomic.AddUint32(&syncCount, 1) // This function is called once per one download
 	}))
 
 	if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
 		t.Fatal("Sync should be successful", err)
 	}
 
-	if syncCount != 3 {
+	if atomic.LoadUint32(&syncCount) != 3 {
 		t.Fatal("3 files should be synced")
 	}
 
-	syncCount = 0
+	atomic.StoreUint32(&syncCount, 0)
 
 	os.RemoveAll(filepath.Join(temp, "foo"))
 
@@ -171,7 +172,7 @@ func TestPartialS3sync(t *testing.T) {
 		t.Fatal("Sync should be successful")
 	}
 
-	if syncCount != 1 {
+	if atomic.LoadUint32(&syncCount) != 1 {
 		t.Fatal("Only 1 file should be synced")
 	}
 
