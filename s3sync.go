@@ -125,66 +125,45 @@ func (m *Manager) syncS3ToS3(sourcePath, destPath *s3Path) error {
 
 func (m *Manager) syncLocalToS3(sourcePath string, destPath *s3Path) error {
 	wg := &sync.WaitGroup{}
-	mutex := sync.Mutex{}
-	errMsgs := []string{}
+	errs := &multiErr{}
 	for source := range filterFilesForSync(listLocalFiles(sourcePath), m.listS3Files(destPath)) {
 		wg.Add(1)
 		go func(source *fileInfo) {
 			defer wg.Done()
 			if source.err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, source.err.Error())
-				mutex.Unlock()
+				errs.Append(source.err)
 				return
 			}
-			err := m.upload(source, sourcePath, destPath)
-
-			if err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, err.Error())
-				mutex.Unlock()
+			if err := m.upload(source, sourcePath, destPath); err != nil {
+				errs.Append(err)
 			}
 		}(source)
 	}
 	wg.Wait()
 
-	if len(errMsgs) > 0 {
-		return errors.New(strings.Join(errMsgs, "\n"))
-	}
-	return nil
-
+	return errs.ErrOrNil()
 }
 
 // syncS3ToLocal syncs the given s3 path to the given local path.
 func (m *Manager) syncS3ToLocal(sourcePath *s3Path, destPath string) error {
 	wg := &sync.WaitGroup{}
-	mutex := sync.Mutex{}
-	errMsgs := []string{}
+	errs := &multiErr{}
 	for source := range filterFilesForSync(m.listS3Files(sourcePath), listLocalFiles(destPath)) {
 		wg.Add(1)
 		go func(source *fileInfo) {
 			defer wg.Done()
 			if source.err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, source.err.Error())
-				mutex.Unlock()
+				errs.Append(source.err)
 				return
 			}
-			err := m.download(source, sourcePath, destPath)
-
-			if err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, err.Error())
-				mutex.Unlock()
+			if err := m.download(source, sourcePath, destPath); err != nil {
+				errs.Append(err)
 			}
 		}(source)
 	}
 	wg.Wait()
 
-	if len(errMsgs) > 0 {
-		return errors.New(strings.Join(errMsgs, "\n"))
-	}
-	return nil
+	return errs.ErrOrNil()
 }
 
 func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
