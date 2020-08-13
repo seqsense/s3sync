@@ -32,6 +32,7 @@ import (
 type Manager struct {
 	s3    s3iface.S3API
 	nJobs int
+	del   bool
 }
 
 type s3Path struct {
@@ -39,12 +40,25 @@ type s3Path struct {
 	bucketPrefix string
 }
 
+type operation int
+
+const (
+	opUpdate operation = iota
+	opDelete
+)
+
 type fileInfo struct {
-	err          error
 	name         string
+	err          error
 	path         string
 	size         int64
 	lastModified time.Time
+	upToDate     bool
+}
+
+type fileOp struct {
+	*fileInfo
+	op operation
 }
 
 func urlToS3Path(url *url.URL) (*s3Path, error) {
@@ -139,7 +153,9 @@ func (m *Manager) syncS3ToS3(chJob chan func(), sourcePath, destPath *s3Path) er
 func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *s3Path) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
-	for source := range filterFilesForSync(listLocalFiles(sourcePath), m.listS3Files(destPath)) {
+	for source := range filterFilesForSync(
+		listLocalFiles(sourcePath), m.listS3Files(destPath), m.del,
+	) {
 		wg.Add(1)
 		source := source
 		chJob <- func() {
@@ -148,8 +164,15 @@ func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *
 				errs.Append(source.err)
 				return
 			}
-			if err := m.upload(source, sourcePath, destPath); err != nil {
-				errs.Append(err)
+			switch source.op {
+			case opUpdate:
+				if err := m.upload(source.fileInfo, sourcePath, destPath); err != nil {
+					errs.Append(err)
+				}
+			case opDelete:
+				if err := m.deleteRemote(source.fileInfo, destPath); err != nil {
+					errs.Append(err)
+				}
 			}
 		}
 	}
@@ -162,7 +185,9 @@ func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *
 func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath string) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
-	for source := range filterFilesForSync(m.listS3Files(sourcePath), listLocalFiles(destPath)) {
+	for source := range filterFilesForSync(
+		m.listS3Files(sourcePath), listLocalFiles(destPath), m.del,
+	) {
 		wg.Add(1)
 		source := source
 		chJob <- func() {
@@ -171,8 +196,15 @@ func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath 
 				errs.Append(source.err)
 				return
 			}
-			if err := m.download(source, sourcePath, destPath); err != nil {
-				errs.Append(err)
+			switch source.op {
+			case opUpdate:
+				if err := m.download(source.fileInfo, sourcePath, destPath); err != nil {
+					errs.Append(err)
+				}
+			case opDelete:
+				if err := m.deleteLocal(source.fileInfo, destPath); err != nil {
+					errs.Append(err)
+				}
 			}
 		}
 	}
@@ -211,6 +243,14 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	return nil
 }
 
+func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
+	targetFilename := filepath.Join(destPath, file.name)
+
+	println("Deleting", targetFilename)
+
+	return os.Remove(targetFilename)
+}
+
 func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
 	sourceFilename := filepath.Join(sourcePath, file.name)
 
@@ -238,6 +278,19 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	}
 
 	return nil
+}
+
+func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
+	destFile := *destPath
+	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+
+	println("Deleting", destFile.String())
+
+	_, err := m.s3.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: aws.String(destFile.bucket),
+		Key:    aws.String(destFile.bucketPrefix),
+	})
+	return err
 }
 
 // listS3Files return a channel which receives the file infos under the given s3Path.
@@ -348,15 +401,15 @@ func sendErrorInfoToChannel(c chan *fileInfo, err error) {
 
 // filterFilesForSync filters the source files from the given destination files, and returns
 // another channel which includes the files necessary to be synced.
-func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo) chan *fileInfo {
-	c := make(chan *fileInfo)
+func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) chan *fileOp {
+	c := make(chan *fileOp)
 
 	destFiles, err := fileInfoChanToMap(destFileChan)
 
 	go func() {
 		defer close(c)
 		if err != nil {
-			sendErrorInfoToChannel(c, err)
+			c <- &fileOp{fileInfo: &fileInfo{err: err}}
 			return
 		}
 		for sourceInfo := range sourceFileChan {
@@ -366,7 +419,18 @@ func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo) chan *fileI
 			// 2. The dest doesn't have the same size as the source
 			// 3. The dest is older than the source
 			if !ok || sourceInfo.size != destInfo.size || sourceInfo.lastModified.After(destInfo.lastModified) {
-				c <- sourceInfo
+				c <- &fileOp{fileInfo: sourceInfo}
+			}
+			if ok {
+				destInfo.upToDate = true
+			}
+		}
+		if del {
+			for _, destInfo := range destFiles {
+				if !destInfo.upToDate {
+					// The source doesn't exist
+					c <- &fileOp{fileInfo: destInfo, op: opDelete}
+				}
 			}
 		}
 	}()

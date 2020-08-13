@@ -27,3 +27,10 @@ func WithParallel(n int) Option {
 		m.nJobs = n
 	}
 }
+
+// WithDelete enables to delete files unexisting on source directory.
+func WithDelete() Option {
+	return func(m *Manager) {
+		m.del = true
+	}
+}
