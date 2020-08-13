@@ -30,11 +30,8 @@ import (
 
 // Manager manages the sync operation.
 type Manager struct {
-	s3 s3iface.S3API
-}
-
-// Option is the option of s3sync behavior.
-type Option struct {
+	s3    s3iface.S3API
+	nJobs int
 }
 
 type s3Path struct {
@@ -66,15 +63,15 @@ func (p *s3Path) String() string {
 }
 
 // New returns a new Manager.
-func New(sess *session.Session) *Manager {
-	return NewWithOption(sess, &Option{})
-}
-
-// NewWithOption returns a new Manager with the given option.
-func NewWithOption(sess *session.Session, option *Option) *Manager {
-	return &Manager{
-		s3: s3.New(sess),
+func New(sess *session.Session, options ...Option) *Manager {
+	m := &Manager{
+		s3:    s3.New(sess),
+		nJobs: DefaultParallel,
 	}
+	for _, o := range options {
+		o(m)
+	}
+	return m
 }
 
 // Sync syncs the files between s3 and local disks.
@@ -89,6 +86,22 @@ func (m *Manager) Sync(source, dest string) error {
 		return err
 	}
 
+	chJob := make(chan func())
+	var wg sync.WaitGroup
+	for i := 0; i < m.nJobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range chJob {
+				job()
+			}
+		}()
+	}
+	defer func() {
+		close(chJob)
+		wg.Wait()
+	}()
+
 	if isS3URL(sourceURL) {
 		sourceS3Path, err := urlToS3Path(sourceURL)
 		if err != nil {
@@ -99,9 +112,9 @@ func (m *Manager) Sync(source, dest string) error {
 			if err != nil {
 				return err
 			}
-			return m.syncS3ToS3(sourceS3Path, destS3Path)
+			return m.syncS3ToS3(chJob, sourceS3Path, destS3Path)
 		}
-		return m.syncS3ToLocal(sourceS3Path, dest)
+		return m.syncS3ToLocal(chJob, sourceS3Path, dest)
 	}
 
 	if isS3URL(destURL) {
@@ -109,7 +122,7 @@ func (m *Manager) Sync(source, dest string) error {
 		if err != nil {
 			return err
 		}
-		return m.syncLocalToS3(source, destS3Path)
+		return m.syncLocalToS3(chJob, source, destS3Path)
 	}
 
 	return errors.New("local to local sync is not supported")
@@ -119,16 +132,17 @@ func isS3URL(url *url.URL) bool {
 	return url.Scheme == "s3"
 }
 
-func (m *Manager) syncS3ToS3(sourcePath, destPath *s3Path) error {
+func (m *Manager) syncS3ToS3(chJob chan func(), sourcePath, destPath *s3Path) error {
 	return errors.New("S3 to S3 sync feature is not implemented")
 }
 
-func (m *Manager) syncLocalToS3(sourcePath string, destPath *s3Path) error {
+func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *s3Path) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(listLocalFiles(sourcePath), m.listS3Files(destPath)) {
 		wg.Add(1)
-		go func(source *fileInfo) {
+		source := source
+		chJob <- func() {
 			defer wg.Done()
 			if source.err != nil {
 				errs.Append(source.err)
@@ -137,7 +151,7 @@ func (m *Manager) syncLocalToS3(sourcePath string, destPath *s3Path) error {
 			if err := m.upload(source, sourcePath, destPath); err != nil {
 				errs.Append(err)
 			}
-		}(source)
+		}
 	}
 	wg.Wait()
 
@@ -145,12 +159,13 @@ func (m *Manager) syncLocalToS3(sourcePath string, destPath *s3Path) error {
 }
 
 // syncS3ToLocal syncs the given s3 path to the given local path.
-func (m *Manager) syncS3ToLocal(sourcePath *s3Path, destPath string) error {
+func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath string) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(m.listS3Files(sourcePath), listLocalFiles(destPath)) {
 		wg.Add(1)
-		go func(source *fileInfo) {
+		source := source
+		chJob <- func() {
 			defer wg.Done()
 			if source.err != nil {
 				errs.Append(source.err)
@@ -159,7 +174,7 @@ func (m *Manager) syncS3ToLocal(sourcePath *s3Path, destPath string) error {
 			if err := m.download(source, sourcePath, destPath); err != nil {
 				errs.Append(err)
 			}
-		}(source)
+		}
 	}
 	wg.Wait()
 
