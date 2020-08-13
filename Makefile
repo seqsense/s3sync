@@ -16,7 +16,7 @@ test:
 
 .PHONY: cover
 cover:
-	go test -coverprofile=cover.out .
+	go test -race -coverprofile=cover.out .
 	go tool cover -html=cover.out -o report.html
 
 .PHONY: s3
@@ -29,4 +29,4 @@ fixture:
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket/foo/
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket/bar/baz/
-
+	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload

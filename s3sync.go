@@ -61,6 +61,10 @@ func urlToS3Path(url *url.URL) (*s3Path, error) {
 	}, nil
 }
 
+func (p *s3Path) String() string {
+	return "s://" + p.bucket + "/" + p.bucketPrefix
+}
+
 // New returns a new Manager.
 func New(sess *session.Session) *Manager {
 	return NewWithOption(sess, &Option{})
@@ -120,39 +124,46 @@ func (m *Manager) syncS3ToS3(sourcePath, destPath *s3Path) error {
 }
 
 func (m *Manager) syncLocalToS3(sourcePath string, destPath *s3Path) error {
-	return errors.New("Local to S3 sync feature is not implemented")
-}
-
-// syncS3ToLocal syncs the given s3 path to the given local path.
-func (m *Manager) syncS3ToLocal(sourcePath *s3Path, destPath string) error {
 	wg := &sync.WaitGroup{}
-	mutex := sync.Mutex{}
-	errMsgs := []string{}
-	for source := range filterFilesForSync(m.listS3Files(sourcePath), listLocalFiles(destPath)) {
+	errs := &multiErr{}
+	for source := range filterFilesForSync(listLocalFiles(sourcePath), m.listS3Files(destPath)) {
 		wg.Add(1)
 		go func(source *fileInfo) {
 			defer wg.Done()
 			if source.err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, source.err.Error())
-				mutex.Unlock()
+				errs.Append(source.err)
 				return
 			}
-			err := m.download(source, sourcePath, destPath)
-
-			if err != nil {
-				mutex.Lock()
-				errMsgs = append(errMsgs, err.Error())
-				mutex.Unlock()
+			if err := m.upload(source, sourcePath, destPath); err != nil {
+				errs.Append(err)
 			}
 		}(source)
 	}
 	wg.Wait()
 
-	if len(errMsgs) > 0 {
-		return errors.New(strings.Join(errMsgs, "\n"))
+	return errs.ErrOrNil()
+}
+
+// syncS3ToLocal syncs the given s3 path to the given local path.
+func (m *Manager) syncS3ToLocal(sourcePath *s3Path, destPath string) error {
+	wg := &sync.WaitGroup{}
+	errs := &multiErr{}
+	for source := range filterFilesForSync(m.listS3Files(sourcePath), listLocalFiles(destPath)) {
+		wg.Add(1)
+		go func(source *fileInfo) {
+			defer wg.Done()
+			if source.err != nil {
+				errs.Append(source.err)
+				return
+			}
+			if err := m.download(source, sourcePath, destPath); err != nil {
+				errs.Append(err)
+			}
+		}(source)
 	}
-	return nil
+	wg.Wait()
+
+	return errs.ErrOrNil()
 }
 
 func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
@@ -176,6 +187,35 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	_, err = s3manager.NewDownloaderWithClient(m.s3).Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(filepath.Join(sourcePath.bucketPrefix, file.name)),
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
+	sourceFilename := filepath.Join(sourcePath, file.name)
+
+	destFile := *destPath
+	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+
+	println("Uploading", file.name, "to", destFile.String())
+
+	reader, err := os.Open(sourceFilename)
+
+	if err != nil {
+		return err
+	}
+
+	defer reader.Close()
+
+	_, err = s3manager.NewUploaderWithClient(m.s3).Upload(&s3manager.UploadInput{
+		Bucket: aws.String(destFile.bucket),
+		Key:    aws.String(destFile.bucketPrefix),
+		Body:   reader,
 	})
 
 	if err != nil {
