@@ -242,6 +242,103 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestDryRun(t *testing.T) {
+	data, err := ioutil.ReadFile(dummyFilename)
+	if err != nil {
+		t.Fatal("Failed to read", dummyFilename)
+	}
+
+	dummyFileSize := len(data)
+
+	t.Run("Download", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		destOnlyFilename := filepath.Join(temp, "dest_only_file")
+		const destOnlyFileSize = 10
+		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		if err := New(getSession(), WithDelete(), WithDryRun()).Sync(
+			"s3://example-bucket", temp,
+		); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		fileHasSize(t, destOnlyFilename, destOnlyFileSize)
+
+		if _, err := os.Stat(filepath.Join(temp, dummyFilename)); !os.IsNotExist(err) {
+			t.Error("File must not be downloaded on dry-run")
+		}
+		if _, err := os.Stat(filepath.Join(temp, "foo", dummyFilename)); !os.IsNotExist(err) {
+			t.Error("File must not be downloaded on dry-run")
+		}
+		if _, err := os.Stat(filepath.Join(temp, "bar/baz", dummyFilename)); !os.IsNotExist(err) {
+			t.Error("File must not be downloaded on dry-run")
+		}
+	})
+	t.Run("Upload", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		for _, dir := range []string{
+			filepath.Join(temp, "foo"), filepath.Join(temp, "bar", "baz"),
+		} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal("Failed to mkdir", err)
+			}
+		}
+
+		for _, file := range []string{
+			filepath.Join(temp, dummyFilename),
+			filepath.Join(temp, "foo", dummyFilename),
+			filepath.Join(temp, "bar", "baz", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		if err := New(
+			getSession(), WithDelete(), WithDryRun(),
+		).Sync(temp, "s3://example-bucket-dryrun"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		svc := s3.New(session.New(&aws.Config{
+			Region:           aws.String("test"),
+			Endpoint:         aws.String("http://localhost:4572"),
+			S3ForcePathStyle: aws.Bool(true),
+		}))
+
+		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket:  aws.String("example-bucket-dryrun"),
+			MaxKeys: aws.Int64(10),
+		})
+		if err != nil {
+			t.Fatal("ListObjects failed", err)
+		}
+		if n := len(result.Contents); n != 1 {
+			t.Fatalf("Number of the files should be 1 (result: %s)", result)
+		}
+		if n := int(*result.Contents[0].Size); n != dummyFileSize {
+			t.Errorf("Object size should be %d, actual %d", dummyFileSize, n)
+		}
+		if *result.Contents[0].Key != "dest_only_file" {
+			t.Error("Unexpected key", result.Contents[0].Key)
+		}
+	})
+}
+
 func TestPartialS3sync(t *testing.T) {
 	data, err := ioutil.ReadFile(dummyFilename)
 	if err != nil {

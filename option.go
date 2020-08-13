@@ -42,3 +42,10 @@ func WithACL(acl string) Option {
 		m.acl = &acl
 	}
 }
+
+// WithDryRun enables dry-run mode.
+func WithDryRun() Option {
+	return func(m *Manager) {
+		m.dryrun = true
+	}
+}
