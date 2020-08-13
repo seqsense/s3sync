@@ -7,6 +7,8 @@
 
 # Usage
 
+Use `New` to create a manager, and `Sync` function syncs between s3 and local filesystem.
+
 ```go
 import (
   "github.com/aws/aws-sdk-go/aws"
@@ -21,13 +23,16 @@ func main() {
   })
 
   syncManager := s3sync.New(sess)
+
   // Sync from s3 to local
   syncManager.Sync("s3://yourbucket/path/to/dir", "local/path/to/dir")
+
+  // Sync from local to s3
+  syncManager.Sync("local/path/to/dir", "s3://yourbucket/path/to/dir")
 }
 ```
 
-- Note: Sync from local to s3 is not implemented yet.
-- Note: Sync from s3 to s3 is not implemented yet as well.
+- Note: Sync from s3 to s3 is not implemented yet.
 
 ## Sets the custom logger
 
