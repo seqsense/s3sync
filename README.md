@@ -1,5 +1,6 @@
 # s3sync
 
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/seqsense/s3sync)](https://pkg.go.dev/github.com/seqsense/s3sync)
 [![Build Status](https://travis-ci.com/seqsense/s3sync.svg?branch=master)](https://travis-ci.com/seqsense/s3sync)
 [![codecov](https://codecov.io/gh/seqsense/s3sync/branch/master/graph/badge.svg)](https://codecov.io/gh/seqsense/s3sync)
 
