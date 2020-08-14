@@ -32,6 +32,7 @@ import (
 type Manager struct {
 	s3    s3iface.S3API
 	nJobs int
+	acl   *string
 }
 
 type s3Path struct {
@@ -230,6 +231,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	_, err = s3manager.NewUploaderWithClient(m.s3).Upload(&s3manager.UploadInput{
 		Bucket: aws.String(destFile.bucket),
 		Key:    aws.String(destFile.bucketPrefix),
+		ACL:    m.acl,
 		Body:   reader,
 	})
 

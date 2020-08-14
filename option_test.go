@@ -32,3 +32,23 @@ func TestWithParallel(t *testing.T) {
 		t.Fatal("Manager.nJobs must be configured by WithParallel option")
 	}
 }
+
+func TestWithACL(t *testing.T) {
+	sess := session.New(&aws.Config{
+		Credentials: credentials.AnonymousCredentials,
+		Region:      aws.String("dummy"),
+	})
+
+	t.Run("Nil", func(t *testing.T) {
+		m := New(sess)
+		if m.acl != nil {
+			t.Fatal("Manager.acl must be nil if initialized with WithACL")
+		}
+	})
+	t.Run("WithACL", func(t *testing.T) {
+		m := New(sess, WithACL("test"))
+		if *m.acl != "test" {
+			t.Fatal("Manager.acl must be configured by WithParallel option")
+		}
+	})
+}
