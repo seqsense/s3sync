@@ -30,10 +30,11 @@ import (
 
 // Manager manages the sync operation.
 type Manager struct {
-	s3    s3iface.S3API
-	nJobs int
-	del   bool
-	acl   *string
+	s3     s3iface.S3API
+	nJobs  int
+	del    bool
+	dryrun bool
+	acl    *string
 }
 
 type s3Path struct {
@@ -219,6 +220,9 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	targetDir := filepath.Dir(targetFilename)
 
 	println("Downloading", file.name, "to", targetFilename)
+	if m.dryrun {
+		return nil
+	}
 
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return err
@@ -248,6 +252,9 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	targetFilename := filepath.Join(destPath, file.name)
 
 	println("Deleting", targetFilename)
+	if m.dryrun {
+		return nil
+	}
 
 	return os.Remove(targetFilename)
 }
@@ -259,6 +266,9 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
 
 	println("Uploading", file.name, "to", destFile.String())
+	if m.dryrun {
+		return nil
+	}
 
 	reader, err := os.Open(sourceFilename)
 
@@ -287,6 +297,9 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
 
 	println("Deleting", destFile.String())
+	if m.dryrun {
+		return nil
+	}
 
 	_, err := m.s3.DeleteObject(&s3.DeleteObjectInput{
 		Bucket: aws.String(destFile.bucket),
