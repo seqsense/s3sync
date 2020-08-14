@@ -27,3 +27,11 @@ func WithParallel(n int) Option {
 		m.nJobs = n
 	}
 }
+
+// WithACL sets Access Control List string for uploading.
+func WithACL(acl string) Option {
+	return func(m *Manager) {
+		acl := acl
+		m.acl = &acl
+	}
+}
