@@ -28,6 +28,13 @@ func WithParallel(n int) Option {
 	}
 }
 
+// WithDelete enables to delete files unexisting on source directory.
+func WithDelete() Option {
+	return func(m *Manager) {
+		m.del = true
+	}
+}
+
 // WithACL sets Access Control List string for uploading.
 func WithACL(acl string) Option {
 	return func(m *Manager) {

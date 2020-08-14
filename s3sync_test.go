@@ -40,19 +40,25 @@ func TestS3syncNotImplemented(t *testing.T) {
 }
 
 func TestS3sync(t *testing.T) {
+	data, err := ioutil.ReadFile(dummyFilename)
+	if err != nil {
+		t.Fatal("Failed to read", dummyFilename)
+	}
+
+	dummyFileSize := len(data)
+
 	t.Run("Download", func(t *testing.T) {
-		data, err := ioutil.ReadFile(dummyFilename)
-		if err != nil {
-			t.Fatal("Failed to read", dummyFilename)
-		}
-
-		expectedFileSize := len(data)
-
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
 			t.Fatal("Failed to create temp dir")
+		}
+
+		destOnlyFilename := filepath.Join(temp, "dest_only_file")
+		const destOnlyFileSize = 10
+		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
 		}
 
 		// The dummy s3 bucket has following files.
@@ -68,13 +74,12 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
-		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
-		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
+		fileHasSize(t, destOnlyFilename, destOnlyFileSize)
+		fileHasSize(t, filepath.Join(temp, dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
 	})
 	t.Run("Upload", func(t *testing.T) {
-		const expectedFileSize = 100
-
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
 
@@ -95,7 +100,7 @@ func TestS3sync(t *testing.T) {
 			filepath.Join(temp, "foo", dummyFilename),
 			filepath.Join(temp, "bar", "baz", dummyFilename),
 		} {
-			if err := ioutil.WriteFile(file, make([]byte, expectedFileSize), 0644); err != nil {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
 			}
 		}
@@ -117,13 +122,114 @@ func TestS3sync(t *testing.T) {
 		if err != nil {
 			t.Fatal("ListObjects failed", err)
 		}
+		if n := len(result.Contents); n != 4 {
+			t.Fatalf("Number of the files should be 4 (result: %s)", result)
+		}
+		var keys []string
+		for _, obj := range result.Contents {
+			if int(*obj.Size) != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.Size)
+			}
+			keys = append(keys, *obj.Key)
+		}
+		sort.Strings(keys)
+		if keys[0] != "README.md" ||
+			keys[1] != "bar/baz/README.md" ||
+			keys[2] != "dest_only_file" ||
+			keys[3] != "foo/README.md" {
+			t.Error("Unexpected keys", keys)
+		}
+	})
+}
+
+func TestDelete(t *testing.T) {
+	data, err := ioutil.ReadFile(dummyFilename)
+	if err != nil {
+		t.Fatal("Failed to read", dummyFilename)
+	}
+
+	dummyFileSize := len(data)
+
+	t.Run("DeleteLocal", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		destOnlyFilename := filepath.Join(temp, "dest_only_file")
+		const destOnlyFileSize = 10
+		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		if err := New(getSession(), WithDelete()).Sync(
+			"s3://example-bucket", temp,
+		); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		if _, err := os.Stat(destOnlyFilename); !os.IsNotExist(err) {
+			t.Error("Destination-only-file should be removed by sync")
+		}
+
+		fileHasSize(t, filepath.Join(temp, dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
+	})
+	t.Run("DeleteRemote", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		for _, dir := range []string{
+			filepath.Join(temp, "foo"), filepath.Join(temp, "bar", "baz"),
+		} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal("Failed to mkdir", err)
+			}
+		}
+
+		for _, file := range []string{
+			filepath.Join(temp, dummyFilename),
+			filepath.Join(temp, "foo", dummyFilename),
+			filepath.Join(temp, "bar", "baz", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		if err := New(
+			getSession(), WithDelete(),
+		).Sync(temp, "s3://example-bucket-delete"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		svc := s3.New(session.New(&aws.Config{
+			Region:           aws.String("test"),
+			Endpoint:         aws.String("http://localhost:4572"),
+			S3ForcePathStyle: aws.Bool(true),
+		}))
+
+		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+			Bucket:  aws.String("example-bucket-delete"),
+			MaxKeys: aws.Int64(10),
+		})
+		if err != nil {
+			t.Fatal("ListObjects failed", err)
+		}
 		if n := len(result.Contents); n != 3 {
 			t.Fatalf("Number of the files should be 3 (result: %s)", result)
 		}
 		var keys []string
 		for _, obj := range result.Contents {
-			if int(*obj.Size) != expectedFileSize {
-				t.Errorf("Object size should be %d, actual %d", expectedFileSize, obj.Size)
+			if int(*obj.Size) != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.Size)
 			}
 			keys = append(keys, *obj.Key)
 		}
