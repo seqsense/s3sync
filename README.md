@@ -48,6 +48,15 @@ s3sync.SetLogger(&CustomLogger{})
 
 The logger needs to implement `Log` and `Logf` methods. See the godoc for details.
 
+## Sets up the parallelism
+
+You can configure the number of parallel jobs for sync. Default is 16.
+
+```
+s3sync.new(sess, s3sync.WithParallel(16)) // This is the same as default.
+s3sync.new(sess, s3sync.WithParallel(1)) // You can sync one by one.
+```
+
 # License
 
 Apache 2.0 License. See [LICENSE](https://github.com/seqsense/s3sync/blob/master/LICENSE).

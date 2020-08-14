@@ -34,3 +34,11 @@ func WithDelete() Option {
 		m.del = true
 	}
 }
+
+// WithACL sets Access Control List string for uploading.
+func WithACL(acl string) Option {
+	return func(m *Manager) {
+		acl := acl
+		m.acl = &acl
+	}
+}
