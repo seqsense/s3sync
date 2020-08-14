@@ -49,12 +49,12 @@ const (
 )
 
 type fileInfo struct {
-	name         string
-	err          error
-	path         string
-	size         int64
-	lastModified time.Time
-	upToDate     bool
+	name           string
+	err            error
+	path           string
+	size           int64
+	lastModified   time.Time
+	existsInSource bool
 }
 
 type fileOp struct {
@@ -424,12 +424,12 @@ func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) c
 				c <- &fileOp{fileInfo: sourceInfo}
 			}
 			if ok {
-				destInfo.upToDate = true
+				destInfo.existsInSource = true
 			}
 		}
 		if del {
 			for _, destInfo := range destFiles {
-				if !destInfo.upToDate {
+				if !destInfo.existsInSource {
 					// The source doesn't exist
 					c <- &fileOp{fileInfo: destInfo, op: opDelete}
 				}
