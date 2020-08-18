@@ -36,6 +36,4 @@ fixture:
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-dryrun
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-dryrun/dest_only_file
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-directory
-	touch .empty_file
-	aws s3 --endpoint-url http://localhost:4572 cp .empty_file s3://example-bucket-directory/test/
-	rm .empty_file
+	aws s3api --endpoint-url http://localhost:4572 put-object --bucket example-bucket-directory --key test/
