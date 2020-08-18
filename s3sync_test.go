@@ -79,6 +79,18 @@ func TestS3sync(t *testing.T) {
 		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
 		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
 	})
+	t.Run("DownloadSkipDirectory", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		if err := New(getSession()).Sync("s3://example-bucket-directory", temp); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+	})
 	t.Run("Upload", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
