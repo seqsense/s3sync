@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"sync/atomic"
 	"testing"
@@ -383,6 +384,94 @@ func TestPartialS3sync(t *testing.T) {
 	fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
 	fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
 	// TODO: Assert only one file was downloaded at the second sync.
+}
+
+func TestListLocalFiles(t *testing.T) {
+	temp, err := ioutil.TempDir("", "s3synctest")
+	defer os.RemoveAll(temp)
+
+	if err != nil {
+		t.Fatal("Failed to create temp dir")
+	}
+
+	for _, dir := range []string{
+		filepath.Join(temp, "empty"),
+		filepath.Join(temp, "foo"),
+		filepath.Join(temp, "bar", "baz"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal("Failed to mkdir", err)
+		}
+	}
+
+	for _, file := range []string{
+		filepath.Join(temp, "test1"),
+		filepath.Join(temp, "foo", "test2"),
+		filepath.Join(temp, "bar", "baz", "test3"),
+	} {
+		if err := ioutil.WriteFile(file, make([]byte, 10), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+	}
+
+	collectFilePaths := func(ch chan *fileInfo) []string {
+		list := []string{}
+		for f := range ch {
+			list = append(list, f.path)
+		}
+		sort.Strings(list)
+		return list
+	}
+
+	t.Run("Root", func(t *testing.T) {
+		paths := collectFilePaths(listLocalFiles(temp))
+		expected := []string{
+			filepath.Join(temp, "bar", "baz", "test3"),
+			filepath.Join(temp, "foo", "test2"),
+			filepath.Join(temp, "test1"),
+		}
+		if !reflect.DeepEqual(expected, paths) {
+			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
+		}
+	})
+
+	t.Run("EmptyDir", func(t *testing.T) {
+		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "empty")))
+		expected := []string{}
+		if !reflect.DeepEqual(expected, paths) {
+			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
+		}
+	})
+
+	t.Run("File", func(t *testing.T) {
+		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "test1")))
+		expected := []string{
+			filepath.Join(temp, "test1"),
+		}
+		if !reflect.DeepEqual(expected, paths) {
+			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
+		}
+	})
+
+	t.Run("Dir", func(t *testing.T) {
+		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "foo")))
+		expected := []string{
+			filepath.Join(temp, "foo", "test2"),
+		}
+		if !reflect.DeepEqual(expected, paths) {
+			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
+		}
+	})
+
+	t.Run("Dir2", func(t *testing.T) {
+		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "bar")))
+		expected := []string{
+			filepath.Join(temp, "bar", "baz", "test3"),
+		}
+		if !reflect.DeepEqual(expected, paths) {
+			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
+		}
+	})
 }
 
 func getSession() *session.Session {
