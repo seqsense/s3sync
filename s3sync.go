@@ -338,6 +338,10 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 	}
 
 	for _, object := range list.Contents {
+		if strings.HasSuffix(*object.Key, "/") {
+			// Skip directory like object
+			continue
+		}
 		name, err := filepath.Rel(path.bucketPrefix, *object.Key)
 		if err != nil {
 			sendErrorInfoToChannel(c, err)
