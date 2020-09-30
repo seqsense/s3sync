@@ -31,6 +31,7 @@ fixture:
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket/bar/baz/
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-upload/dest_only_file
+	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload-file
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-delete
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-delete/dest_only_file
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-dryrun

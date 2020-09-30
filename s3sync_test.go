@@ -134,6 +134,49 @@ func TestS3sync(t *testing.T) {
 			t.Error("Unexpected keys", objs)
 		}
 	})
+	t.Run("UploadSingleFile", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		filePath := filepath.Join(temp, dummyFilename)
+		if err := ioutil.WriteFile(filePath, make([]byte, dummyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		// Copy README.md to s3://example-bucket-upload-file/README.md
+		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		// Copy README.md to s3://example-bucket-upload-file/foo/README.md
+		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file/foo/"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		// Copy README.md to s3://example-bucket-upload-file/foo/test.md
+		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file/foo/test.md"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		objs := listObjectsSorted(t, "example-bucket-upload-file")
+		if n := len(objs); n != 3 {
+			t.Fatalf("Number of the files should be 3 (result: %v)", objs)
+		}
+		for _, obj := range objs {
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
+			}
+		}
+		if objs[0].path != "README.md" ||
+			objs[1].path != "foo/README.md" ||
+			objs[2].path != "foo/test.md" {
+			t.Error("Unexpected keys", objs)
+		}
+	})
 }
 
 func TestDelete(t *testing.T) {
@@ -342,8 +385,8 @@ func TestPartialS3sync(t *testing.T) {
 		t.Fatal("Sync should be successful")
 	}
 
-	if atomic.LoadUint32(&syncCount) != 1 {
-		t.Fatal("Only 1 file should be synced")
+	if n := atomic.LoadUint32(&syncCount); n != 1 {
+		t.Fatalf("Only 1 file should be synced, %d files synced", n)
 	}
 
 	fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
@@ -457,9 +500,10 @@ func createLoggerWithLogFunc(log func(v ...interface{})) LoggerIF {
 func fileHasSize(t *testing.T, filename string, expectedSize int) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		t.Fatal(filename, "is not synced")
+		t.Error(filename, "is not synced")
+		return
 	}
 	if len(data) != expectedSize {
-		t.Fatal(filename, "is not synced")
+		t.Error(filename, "is not synced")
 	}
 }
