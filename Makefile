@@ -21,7 +21,7 @@ cover:
 
 .PHONY: s3
 s3:
-	docker run -p 4572:4572 -e SERVICES=s3 localstack/localstack
+	docker run -p 4572:4566 -e SERVICES=s3 localstack/localstack
 
 .PHONY: fixture
 fixture:
