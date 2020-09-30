@@ -263,7 +263,13 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 }
 
 func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
-	targetFilename := filepath.Join(destPath, file.name)
+	var targetFilename string
+	if !strings.HasSuffix(destPath, "/") && file.singleFile {
+		// Destination path is not a directory and source is a single file.
+		targetFilename = destPath
+	} else {
+		targetFilename = filepath.Join(destPath, file.name)
+	}
 
 	println("Deleting", targetFilename)
 	if m.dryrun {
@@ -316,7 +322,10 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
-	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
+		// If source is a single file and destination is not a directory, use destination URL as is.
+		destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+	}
 
 	println("Deleting", destFile.String())
 	if m.dryrun {
