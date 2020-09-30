@@ -248,6 +248,30 @@ func TestDelete(t *testing.T) {
 		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
 		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
 	})
+	t.Run("DeleteLocalSingleFile", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		destOnlyFilename := filepath.Join(temp, "dest_only_file")
+		const destOnlyFileSize = 10
+		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		if err := New(getSession(), WithDelete()).Sync(
+			"s3://example-bucket/dest_only_file", destOnlyFilename,
+		); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		if _, err := os.Stat(destOnlyFilename); !os.IsNotExist(err) {
+			t.Error("Destination-only-file should be removed by sync")
+		}
+	})
 	t.Run("DeleteRemote", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
@@ -292,6 +316,31 @@ func TestDelete(t *testing.T) {
 		if objs[0].path != "README.md" ||
 			objs[1].path != "bar/baz/README.md" ||
 			objs[2].path != "foo/README.md" {
+			t.Error("Unexpected keys", objs)
+		}
+	})
+	t.Run("DeleteRemoteSingleFile", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		if err := New(
+			getSession(), WithDelete(),
+		).Sync(filepath.Join(temp, "dest_only_file"), "s3://example-bucket-delete-file/dest_only_file"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		objs := listObjectsSorted(t, "example-bucket-delete-file")
+		if n := len(objs); n != 1 {
+			t.Fatalf("Number of the files should be 1 (result: %v)", objs)
+		}
+		if objs[0].size != dummyFileSize {
+			t.Errorf("Object size should be %d, actual %d", dummyFileSize, objs[0].size)
+		}
+		if objs[0].path != "README.md" {
 			t.Error("Unexpected keys", objs)
 		}
 	})
