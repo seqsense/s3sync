@@ -20,10 +20,6 @@ import (
 	"sort"
 	"sync/atomic"
 	"testing"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 const dummyFilename = "README.md"
@@ -122,35 +118,20 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		svc := s3.New(session.New(&aws.Config{
-			Region:           aws.String("test"),
-			Endpoint:         aws.String("http://localhost:4572"),
-			S3ForcePathStyle: aws.Bool(true),
-		}))
-
-		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
-			Bucket:  aws.String("example-bucket-upload"),
-			MaxKeys: aws.Int64(10),
-		})
-		if err != nil {
-			t.Fatal("ListObjects failed", err)
+		objs := listObjectsSorted(t, "example-bucket-upload")
+		if n := len(objs); n != 4 {
+			t.Fatalf("Number of the files should be 4 (result: %v)", objs)
 		}
-		if n := len(result.Contents); n != 4 {
-			t.Fatalf("Number of the files should be 4 (result: %s)", result)
-		}
-		var keys []string
-		for _, obj := range result.Contents {
-			if int(*obj.Size) != dummyFileSize {
-				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.Size)
+		for _, obj := range objs {
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
 			}
-			keys = append(keys, *obj.Key)
 		}
-		sort.Strings(keys)
-		if keys[0] != "README.md" ||
-			keys[1] != "bar/baz/README.md" ||
-			keys[2] != "dest_only_file" ||
-			keys[3] != "foo/README.md" {
-			t.Error("Unexpected keys", keys)
+		if objs[0].path != "README.md" ||
+			objs[1].path != "bar/baz/README.md" ||
+			objs[2].path != "dest_only_file" ||
+			objs[3].path != "foo/README.md" {
+			t.Error("Unexpected keys", objs)
 		}
 	})
 }
@@ -223,34 +204,19 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		svc := s3.New(session.New(&aws.Config{
-			Region:           aws.String("test"),
-			Endpoint:         aws.String("http://localhost:4572"),
-			S3ForcePathStyle: aws.Bool(true),
-		}))
-
-		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
-			Bucket:  aws.String("example-bucket-delete"),
-			MaxKeys: aws.Int64(10),
-		})
-		if err != nil {
-			t.Fatal("ListObjects failed", err)
+		objs := listObjectsSorted(t, "example-bucket-delete")
+		if n := len(objs); n != 3 {
+			t.Fatalf("Number of the files should be 3 (result: %v)", objs)
 		}
-		if n := len(result.Contents); n != 3 {
-			t.Fatalf("Number of the files should be 3 (result: %s)", result)
-		}
-		var keys []string
-		for _, obj := range result.Contents {
-			if int(*obj.Size) != dummyFileSize {
-				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.Size)
+		for _, obj := range objs {
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
 			}
-			keys = append(keys, *obj.Key)
 		}
-		sort.Strings(keys)
-		if keys[0] != "README.md" ||
-			keys[1] != "bar/baz/README.md" ||
-			keys[2] != "foo/README.md" {
-			t.Error("Unexpected keys", keys)
+		if objs[0].path != "README.md" ||
+			objs[1].path != "bar/baz/README.md" ||
+			objs[2].path != "foo/README.md" {
+			t.Error("Unexpected keys", objs)
 		}
 	})
 }
@@ -327,27 +293,15 @@ func TestDryRun(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		svc := s3.New(session.New(&aws.Config{
-			Region:           aws.String("test"),
-			Endpoint:         aws.String("http://localhost:4572"),
-			S3ForcePathStyle: aws.Bool(true),
-		}))
-
-		result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
-			Bucket:  aws.String("example-bucket-dryrun"),
-			MaxKeys: aws.Int64(10),
-		})
-		if err != nil {
-			t.Fatal("ListObjects failed", err)
+		objs := listObjectsSorted(t, "example-bucket-delete")
+		if n := len(objs); n != 1 {
+			t.Fatalf("Number of the files should be 1 (result: %v)", objs)
 		}
-		if n := len(result.Contents); n != 1 {
-			t.Fatalf("Number of the files should be 1 (result: %s)", result)
-		}
-		if n := int(*result.Contents[0].Size); n != dummyFileSize {
+		if n := objs[0].size; n != dummyFileSize {
 			t.Errorf("Object size should be %d, actual %d", dummyFileSize, n)
 		}
-		if *result.Contents[0].Key != "dest_only_file" {
-			t.Error("Unexpected key", result.Contents[0].Key)
+		if objs[0].path != "dest_only_file" {
+			t.Error("Unexpected key", objs[0].path)
 		}
 	})
 }
@@ -484,15 +438,6 @@ func TestListLocalFiles(t *testing.T) {
 			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
 		}
 	})
-}
-
-func getSession() *session.Session {
-	sess, _ := session.NewSession(&aws.Config{
-		Region:           aws.String("ap-northeast-1"),
-		S3ForcePathStyle: aws.Bool(true),
-		Endpoint:         aws.String("http://localhost:4572"),
-	})
-	return sess
 }
 
 type dummyLogger struct {
