@@ -55,6 +55,7 @@ type fileInfo struct {
 	path           string
 	size           int64
 	lastModified   time.Time
+	singleFile     bool
 	existsInSource bool
 }
 
@@ -216,7 +217,13 @@ func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath 
 }
 
 func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
-	targetFilename := filepath.Join(destPath, file.name)
+	var targetFilename string
+	if !strings.HasSuffix(destPath, "/") && file.singleFile {
+		// Destination path is not a directory and source is a single file.
+		targetFilename = destPath
+	} else {
+		targetFilename = filepath.Join(destPath, file.name)
+	}
 	targetDir := filepath.Dir(targetFilename)
 
 	println("Downloading", file.name, "to", targetFilename)
@@ -236,9 +243,16 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 
 	defer writer.Close()
 
+	var sourceFile string
+	if file.singleFile {
+		sourceFile = file.name
+	} else {
+		sourceFile = filepath.Join(sourcePath.bucketPrefix, file.name)
+	}
+
 	_, err = s3manager.NewDownloaderWithClient(m.s3).Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
-		Key:    aws.String(filepath.Join(sourcePath.bucketPrefix, file.name)),
+		Key:    aws.String(sourceFile),
 	})
 
 	if err != nil {
@@ -260,10 +274,18 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 }
 
 func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
-	sourceFilename := filepath.Join(sourcePath, file.name)
+	var sourceFilename string
+	if file.singleFile {
+		sourceFilename = file.name
+	} else {
+		sourceFilename = filepath.Join(sourcePath, file.name)
+	}
 
 	destFile := *destPath
-	destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
+		// If source is a single file and destination is not a directory, use destination URL as is.
+		destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+	}
 
 	println("Uploading", file.name, "to", destFile.String())
 	if m.dryrun {
@@ -347,11 +369,22 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 			sendErrorInfoToChannel(c, err)
 			continue
 		}
-		c <- &fileInfo{
-			name:         name,
-			path:         *object.Key,
-			size:         *object.Size,
-			lastModified: *object.LastModified,
+		if name == "." {
+			// Single file was specified
+			c <- &fileInfo{
+				name:         filepath.Base(*object.Key),
+				path:         filepath.Dir(*object.Key),
+				size:         *object.Size,
+				lastModified: *object.LastModified,
+				singleFile:   true,
+			}
+		} else {
+			c <- &fileInfo{
+				name:         name,
+				path:         *object.Key,
+				size:         *object.Size,
+				lastModified: *object.LastModified,
+			}
 		}
 	}
 
@@ -377,17 +410,19 @@ func listLocalFiles(basePath string) chan *fileInfo {
 			sendErrorInfoToChannel(c, err)
 			return
 		}
-		sendFileInfoToChannel(c, basePath, basePath, stat)
 
 		if !stat.IsDir() {
+			sendFileInfoToChannel(c, filepath.Dir(basePath), basePath, stat, true)
 			return
 		}
+
+		sendFileInfoToChannel(c, basePath, basePath, stat, false)
 
 		err = filepath.Walk(basePath, func(path string, stat os.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
-			sendFileInfoToChannel(c, basePath, path, stat)
+			sendFileInfoToChannel(c, basePath, path, stat, false)
 			return nil
 		})
 
@@ -399,7 +434,7 @@ func listLocalFiles(basePath string) chan *fileInfo {
 	return c
 }
 
-func sendFileInfoToChannel(c chan *fileInfo, basePath, path string, stat os.FileInfo) {
+func sendFileInfoToChannel(c chan *fileInfo, basePath, path string, stat os.FileInfo, singleFile bool) {
 	if stat == nil || stat.IsDir() {
 		return
 	}
@@ -409,6 +444,7 @@ func sendFileInfoToChannel(c chan *fileInfo, basePath, path string, stat os.File
 		path:         path,
 		size:         stat.Size(),
 		lastModified: stat.ModTime(),
+		singleFile:   singleFile,
 	}
 }
 

@@ -103,11 +103,11 @@ func TestS3sync(t *testing.T) {
 		}
 
 		// Download to ./README.md
-		if err := New(getSession()).Sync("s3://example-bucket/README.md", temp); err != nil {
+		if err := New(getSession()).Sync("s3://example-bucket/README.md", temp+"/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 		// Download to ./foo/README.md
-		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "foo/")); err != nil {
+		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "foo")+"/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 		// Download to ./foo/README.md
