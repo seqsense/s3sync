@@ -293,7 +293,7 @@ func TestDryRun(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		objs := listObjectsSorted(t, "example-bucket-delete")
+		objs := listObjectsSorted(t, "example-bucket-dryrun")
 		if n := len(objs); n != 1 {
 			t.Fatalf("Number of the files should be 1 (result: %v)", objs)
 		}
