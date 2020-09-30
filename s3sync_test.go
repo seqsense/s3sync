@@ -88,6 +88,39 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 	})
+	t.Run("DownloadSingleFile", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		destOnlyFilename := filepath.Join(temp, "dest_only_file")
+		const destOnlyFileSize = 10
+		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		// Download to ./README.md
+		if err := New(getSession()).Sync("s3://example-bucket/README.md", temp); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+		// Download to ./foo/README.md
+		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "foo/")); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+		// Download to ./foo/README.md
+		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "test.md")); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		fileHasSize(t, destOnlyFilename, destOnlyFileSize)
+		fileHasSize(t, filepath.Join(temp, dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
+		fileHasSize(t, filepath.Join(temp, "test.md"), dummyFileSize)
+	})
+
 	t.Run("Upload", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
