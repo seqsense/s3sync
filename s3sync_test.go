@@ -110,7 +110,7 @@ func TestS3sync(t *testing.T) {
 		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "foo")+"/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
-		// Download to ./foo/README.md
+		// Download to ./test.md
 		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "test.md")); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
