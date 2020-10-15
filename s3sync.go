@@ -282,7 +282,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
 	var sourceFilename string
 	if file.singleFile {
-		sourceFilename = file.name
+		sourceFilename = sourcePath
 	} else {
 		sourceFilename = filepath.Join(sourcePath, file.name)
 	}
