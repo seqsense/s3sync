@@ -180,6 +180,14 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
+		if err := os.MkdirAll(filepath.Join(temp, "foo"), 0755); err != nil {
+			t.Fatal("Failed to mkdir", err)
+		}
+		filePath2 := filepath.Join(temp, "foo", "test2.md")
+		if err := ioutil.WriteFile(filePath2, make([]byte, dummyFileSize), 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
 		// Copy README.md to s3://example-bucket-upload-file/README.md
 		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file"); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -195,9 +203,14 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
+		// Copy foo/README.md to s3://example-bucket-upload-file/foo/bar/test.md
+		if err := New(getSession()).Sync(filePath2, "s3://example-bucket-upload-file/foo/bar/test2.md"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
 		objs := listObjectsSorted(t, "example-bucket-upload-file")
-		if n := len(objs); n != 3 {
-			t.Fatalf("Number of the files should be 3 (result: %v)", objs)
+		if n := len(objs); n != 4 {
+			t.Fatalf("Number of the files should be 4 (result: %v)", objs)
 		}
 		for _, obj := range objs {
 			if obj.size != dummyFileSize {
@@ -206,7 +219,8 @@ func TestS3sync(t *testing.T) {
 		}
 		if objs[0].path != "README.md" ||
 			objs[1].path != "foo/README.md" ||
-			objs[2].path != "foo/test.md" {
+			objs[2].path != "foo/bar/test2.md" ||
+			objs[3].path != "foo/test.md" {
 			t.Error("Unexpected keys", objs)
 		}
 	})
