@@ -31,8 +31,9 @@ func getSession() *session.Session {
 }
 
 type s3Object struct {
-	path string
-	size int
+	path        string
+	size        int
+	contentType string
 }
 
 type s3ObjectList []s3Object
@@ -45,6 +46,22 @@ func (l s3ObjectList) Less(i, j int) bool {
 }
 func (l s3ObjectList) Swap(i, j int) {
 	l[i], l[j] = l[j], l[i]
+}
+
+func deleteObject(t *testing.T, bucket, key string) {
+	svc := s3.New(session.New(&aws.Config{
+		Region:           aws.String("test"),
+		Endpoint:         aws.String("http://localhost:4572"),
+		S3ForcePathStyle: aws.Bool(true),
+	}))
+
+	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
+		Bucket: &bucket,
+		Key:    &key,
+	})
+	if err != nil {
+		t.Fatal("DeleteObject failed", err)
+	}
 }
 
 func listObjectsSorted(t *testing.T, bucket string) []s3Object {
@@ -63,9 +80,17 @@ func listObjectsSorted(t *testing.T, bucket string) []s3Object {
 	}
 	var objs []s3Object
 	for _, obj := range result.Contents {
+		o, err := svc.GetObject(&s3.GetObjectInput{
+			Bucket: &bucket,
+			Key:    obj.Key,
+		})
+		if err != nil {
+			t.Fatal("GetObject failed", err)
+		}
 		objs = append(objs, s3Object{
-			path: *obj.Key,
-			size: int(*obj.Size),
+			path:        *obj.Key,
+			size:        int(*obj.Size),
+			contentType: *o.ContentType,
 		})
 	}
 	sort.Sort(s3ObjectList(objs))
