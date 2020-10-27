@@ -26,15 +26,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 // Manager manages the sync operation.
 type Manager struct {
-	s3     s3iface.S3API
-	nJobs  int
-	del    bool
-	dryrun bool
-	acl    *string
+	s3          s3iface.S3API
+	nJobs       int
+	del         bool
+	dryrun      bool
+	acl         *string
+	guessMime   bool
+	contentType *string
 }
 
 type s3Path struct {
@@ -82,8 +85,9 @@ func (p *s3Path) String() string {
 // New returns a new Manager.
 func New(sess *session.Session, options ...Option) *Manager {
 	m := &Manager{
-		s3:    s3.New(sess),
-		nJobs: DefaultParallel,
+		s3:        s3.New(sess),
+		nJobs:     DefaultParallel,
+		guessMime: true,
 	}
 	for _, o := range options {
 		o(m)
@@ -298,8 +302,20 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 		return nil
 	}
 
-	reader, err := os.Open(sourceFilename)
+	var contentType *string
+	switch {
+	case m.contentType != nil:
+		contentType = m.contentType
+	case m.guessMime:
+		mime, err := mimetype.DetectFile(sourceFilename)
+		if err != nil {
+			return err
+		}
+		s := mime.String()
+		contentType = &s
+	}
 
+	reader, err := os.Open(sourceFilename)
 	if err != nil {
 		return err
 	}
@@ -307,10 +323,11 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	defer reader.Close()
 
 	_, err = s3manager.NewUploaderWithClient(m.s3).Upload(&s3manager.UploadInput{
-		Bucket: aws.String(destFile.bucket),
-		Key:    aws.String(destFile.bucketPrefix),
-		ACL:    m.acl,
-		Body:   reader,
+		Bucket:      aws.String(destFile.bucket),
+		Key:         aws.String(destFile.bucketPrefix),
+		ACL:         m.acl,
+		Body:        reader,
+		ContentType: contentType,
 	})
 
 	if err != nil {

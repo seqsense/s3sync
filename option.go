@@ -49,3 +49,17 @@ func WithDryRun() Option {
 		m.dryrun = true
 	}
 }
+
+// WithoutGuessMimeType disables guessing MIME type from contents.
+func WithoutGuessMimeType() Option {
+	return func(m *Manager) {
+		m.guessMime = false
+	}
+}
+
+// WithContentType overwrites uploading MIME type.
+func WithContentType(mime string) Option {
+	return func(m *Manager) {
+		m.contentType = &mime
+	}
+}

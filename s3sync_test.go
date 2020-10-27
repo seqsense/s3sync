@@ -13,6 +13,8 @@
 package s3sync
 
 import (
+	"bytes"
+	"compress/gzip"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -577,6 +579,66 @@ func TestListLocalFiles(t *testing.T) {
 			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
 		}
 	})
+}
+
+func TestS3sync_GuessMime(t *testing.T) {
+	data, err := ioutil.ReadFile(dummyFilename)
+	if err != nil {
+		t.Fatal("Failed to read", dummyFilename)
+	}
+
+	temp, err := ioutil.TempDir("", "s3synctest")
+	defer os.RemoveAll(temp)
+
+	if err != nil {
+		t.Fatal("Failed to create temp dir", err)
+	}
+
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(data); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := ioutil.WriteFile(filepath.Join(temp, dummyFilename), buf.Bytes(), 0644); err != nil {
+		t.Fatal("Failed to write", err)
+	}
+
+	testCases := map[string]struct {
+		options  []Option
+		expected string
+	}{
+		"Guess": {
+			options:  []Option{},
+			expected: "application/gzip",
+		},
+		"NoGuess": {
+			options:  []Option{WithoutGuessMimeType()},
+			expected: "binary/octet-stream",
+		},
+		"Overwrite": {
+			options:  []Option{WithContentType("test/dummy")},
+			expected: "test/dummy",
+		},
+	}
+	for name, tt := range testCases {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			deleteObject(t, "example-bucket-mime", dummyFilename)
+
+			if err := New(getSession(), tt.options...).Sync(temp, "s3://example-bucket-mime"); err != nil {
+				t.Fatal("Sync should be successful", err)
+			}
+
+			objs := listObjectsSorted(t, "example-bucket-mime")
+			if n := len(objs); n != 1 {
+				t.Fatalf("Number of the files should be 1 (result: %v)", objs)
+			}
+			if objs[0].contentType != tt.expected {
+				t.Errorf("Object ContentType should be %s, actual %s", tt.expected, objs[0].contentType)
+			}
+		})
+	}
 }
 
 type dummyLogger struct {
