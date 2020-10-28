@@ -240,7 +240,6 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	}
 
 	writer, err := os.Create(targetFilename)
-
 	if err != nil {
 		return err
 	}
@@ -258,12 +257,12 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
 	})
-
 	if err != nil {
 		return err
 	}
 
-	if err := os.Chtimes(targetFilename, file.lastModified, file.lastModified); err != nil {
+	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
+	if err != nil {
 		return err
 	}
 
