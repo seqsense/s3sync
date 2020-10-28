@@ -263,6 +263,10 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		return err
 	}
 
+	if err := os.Chtimes(targetFilename, file.lastModified, file.lastModified); err != nil {
+		return err
+	}
+
 	return nil
 }
 
