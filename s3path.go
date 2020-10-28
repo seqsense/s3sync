@@ -19,6 +19,8 @@ import (
 	"strings"
 )
 
+var errNoBucketName = errors.New("s3 url is missing bucket name")
+
 type s3Path struct {
 	bucket       string
 	bucketPrefix string
@@ -26,7 +28,7 @@ type s3Path struct {
 
 func urlToS3Path(url *url.URL) (*s3Path, error) {
 	if url.Host == "" {
-		return nil, errors.New("s3 url is missing bucket name")
+		return nil, errNoBucketName
 	}
 
 	return &s3Path{
