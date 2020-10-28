@@ -22,6 +22,7 @@ import (
 	"sort"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const dummyFilename = "README.md"
@@ -60,6 +61,8 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
+		tBeforeSync := time.Now()
+
 		// The dummy s3 bucket has following files.
 		//
 		// s3://example-bucket/
@@ -74,9 +77,16 @@ func TestS3sync(t *testing.T) {
 		}
 
 		fileHasSize(t, destOnlyFilename, destOnlyFileSize)
-		fileHasSize(t, filepath.Join(temp, dummyFilename), dummyFileSize)
-		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
-		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
+
+		for _, filename := range []string{
+			filepath.Join(temp, dummyFilename),
+			filepath.Join(temp, "foo", dummyFilename),
+			filepath.Join(temp, "bar/baz", dummyFilename),
+		} {
+			fileHasSize(t, filename, dummyFileSize)
+			// Files must be made before test
+			fileModTimeBefore(t, filename, tBeforeSync)
+		}
 	})
 	t.Run("DownloadSkipDirectory", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
@@ -653,15 +663,4 @@ func (d *dummyLogger) Logf(format string, v ...interface{}) {
 
 func createLoggerWithLogFunc(log func(v ...interface{})) LoggerIF {
 	return &dummyLogger{log: log}
-}
-
-func fileHasSize(t *testing.T, filename string, expectedSize int) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		t.Error(filename, "is not synced")
-		return
-	}
-	if len(data) != expectedSize {
-		t.Error(filename, "is not synced")
-	}
 }

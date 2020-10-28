@@ -13,8 +13,11 @@
 package s3sync
 
 import (
+	"io/ioutil"
+	"os"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -95,4 +98,26 @@ func listObjectsSorted(t *testing.T, bucket string) []s3Object {
 	}
 	sort.Sort(s3ObjectList(objs))
 	return objs
+}
+
+func fileHasSize(t *testing.T, filename string, expectedSize int) {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		t.Error(filename, "is not synced")
+		return
+	}
+	if n := len(data); n != expectedSize {
+		t.Errorf("%s is not synced (file size is expected to be %d, actual %d)", filename, expectedSize, n)
+	}
+}
+
+func fileModTimeBefore(t *testing.T, filename string, t0 time.Time) {
+	info, err := os.Stat(filename)
+	if err != nil {
+		t.Error("Failed to get stat:", err)
+		return
+	}
+	if t1 := info.ModTime(); !t1.Before(t0) {
+		t.Errorf("File modification time %v is later than %v", t1, t0)
+	}
 }
