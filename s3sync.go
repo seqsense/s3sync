@@ -40,11 +40,6 @@ type Manager struct {
 	contentType *string
 }
 
-type s3Path struct {
-	bucket       string
-	bucketPrefix string
-}
-
 type operation int
 
 const (
@@ -65,21 +60,6 @@ type fileInfo struct {
 type fileOp struct {
 	*fileInfo
 	op operation
-}
-
-func urlToS3Path(url *url.URL) (*s3Path, error) {
-	if url.Host == "" {
-		return nil, errors.New("s3 url is missing bucket name")
-	}
-
-	return &s3Path{
-		bucket:       url.Host,
-		bucketPrefix: strings.TrimPrefix(url.Path, "/"),
-	}, nil
-}
-
-func (p *s3Path) String() string {
-	return "s://" + p.bucket + "/" + p.bucketPrefix
 }
 
 // New returns a new Manager.
