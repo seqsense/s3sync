@@ -1,0 +1,37 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+
+env:
+  # These dummy credentials are necessary for running tests against
+  # localstack s3 service
+  AWS_ACCESS_KEY_ID: foo
+  AWS_SECRET_ACCESS_KEY: bar
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go_version:
+          - 1.14
+          - 1.15
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.go_version }}
+      - name: Test
+        run: |
+          # Start mock s3 service
+          docker run -d -p 4572:4566 -e SERVICES=s3 localstack/localstack
+          while ! curl http://localhost:4572; do sleep 1; done
+          sleep 5
+          # Set up fixture S3 files
+          make fixture
+          make cover # run test with coverage
+      - uses: codecov/codecov-action@v1
+        with:
+          file: ./cover.out
