@@ -1,6 +1,6 @@
 # s3sync
 
-[![Build Status](https://travis-ci.com/seqsense/s3sync.svg?branch=master)](https://travis-ci.com/seqsense/s3sync)
+![CI](https://github.com/seqsense/s3sync/workflows/CI/badge.svg)
 [![codecov](https://codecov.io/gh/seqsense/s3sync/branch/master/graph/badge.svg)](https://codecov.io/gh/seqsense/s3sync)
 
 > Golang utility for syncing between s3 and local
