@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - release-*
 
 env:
   # These dummy credentials are necessary for running tests against
