@@ -19,6 +19,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 )
 
 func TestWithParallel(t *testing.T) {
@@ -49,6 +50,30 @@ func TestWithACL(t *testing.T) {
 		m := New(sess, WithACL("test"))
 		if *m.acl != "test" {
 			t.Fatal("Manager.acl must be configured by WithParallel option")
+		}
+	})
+}
+
+func TestUploaderDownloaderOptions(t *testing.T) {
+	sess := session.New(&aws.Config{
+		Credentials: credentials.AnonymousCredentials,
+		Region:      aws.String("dummy"),
+	})
+
+	t.Run("Uploader", func(t *testing.T) {
+		m := New(sess, WithUploaderOptions(
+			func(u *s3manager.Uploader) {},
+		))
+		if len(m.uploaderOpts) != 1 {
+			t.Fatal("Manager.uploaderOpts must have a option")
+		}
+	})
+	t.Run("Downloader", func(t *testing.T) {
+		m := New(sess, WithDownloaderOptions(
+			func(d *s3manager.Downloader) {},
+		))
+		if len(m.downloaderOpts) != 1 {
+			t.Fatal("Manager.downloaderOpts must have a option")
 		}
 	})
 }

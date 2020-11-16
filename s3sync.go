@@ -31,13 +31,15 @@ import (
 
 // Manager manages the sync operation.
 type Manager struct {
-	s3          s3iface.S3API
-	nJobs       int
-	del         bool
-	dryrun      bool
-	acl         *string
-	guessMime   bool
-	contentType *string
+	s3             s3iface.S3API
+	nJobs          int
+	del            bool
+	dryrun         bool
+	acl            *string
+	guessMime      bool
+	contentType    *string
+	downloaderOpts []func(*s3manager.Downloader)
+	uploaderOpts   []func(*s3manager.Uploader)
 }
 
 type operation int
@@ -233,7 +235,10 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		sourceFile = filepath.Join(sourcePath.bucketPrefix, file.name)
 	}
 
-	_, err = s3manager.NewDownloaderWithClient(m.s3).Download(writer, &s3.GetObjectInput{
+	_, err = s3manager.NewDownloaderWithClient(
+		m.s3,
+		m.downloaderOpts...,
+	).Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
 	})
@@ -305,7 +310,10 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
-	_, err = s3manager.NewUploaderWithClient(m.s3).Upload(&s3manager.UploadInput{
+	_, err = s3manager.NewUploaderWithClient(
+		m.s3,
+		m.uploaderOpts...,
+	).Upload(&s3manager.UploadInput{
 		Bucket:      aws.String(destFile.bucket),
 		Key:         aws.String(destFile.bucketPrefix),
 		ACL:         m.acl,
