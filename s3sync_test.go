@@ -477,30 +477,67 @@ func TestPartialS3sync(t *testing.T) {
 		atomic.AddUint32(&syncCount, 1) // This function is called once per one download
 	}))
 
-	if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
-		t.Fatal("Sync should be successful", err)
+	assertFileSize := func(t *testing.T) {
+		fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
+		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
+		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
 	}
 
-	if atomic.LoadUint32(&syncCount) != 3 {
-		t.Fatal("3 files should be synced")
-	}
+	t.Run("DestinationEmpty", func(t *testing.T) {
+		atomic.StoreUint32(&syncCount, 0)
 
-	atomic.StoreUint32(&syncCount, 0)
+		if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
 
-	os.RemoveAll(filepath.Join(temp, "foo"))
+		if atomic.LoadUint32(&syncCount) != 3 {
+			t.Fatal("3 files should be synced")
+		}
 
-	if New(getSession()).Sync("s3://example-bucket", temp) != nil {
-		t.Fatal("Sync should be successful")
-	}
+		assertFileSize(t)
+	})
 
-	if n := atomic.LoadUint32(&syncCount); n != 1 {
-		t.Fatalf("Only 1 file should be synced, %d files synced", n)
-	}
+	t.Run("DestinationLackOneFile", func(t *testing.T) {
+		atomic.StoreUint32(&syncCount, 0)
 
-	fileHasSize(t, filepath.Join(temp, dummyFilename), expectedFileSize)
-	fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), expectedFileSize)
-	fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), expectedFileSize)
-	// TODO: Assert only one file was downloaded at the second sync.
+		os.RemoveAll(filepath.Join(temp, "foo"))
+
+		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+			t.Fatal("Sync should be successful")
+		}
+
+		if n := atomic.LoadUint32(&syncCount); n != 1 {
+			t.Fatalf("Only 1 file should be synced, %d files synced", n)
+		}
+
+		assertFileSize(t)
+	})
+
+	t.Run("DestinationOneOldFile", func(t *testing.T) {
+		atomic.StoreUint32(&syncCount, 0)
+
+		oldTime := time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
+		filename := filepath.Join(temp, "README.md")
+		os.Chtimes(filename, oldTime, oldTime)
+
+		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+			t.Fatal("Sync should be successful")
+		}
+
+		if n := atomic.LoadUint32(&syncCount); n != 1 {
+			t.Fatalf("Only 1 file should be synced, %d files synced", n)
+		}
+
+		stat, err := os.Stat(filename)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !stat.ModTime().After(oldTime) {
+			t.Errorf("File modification time must be updated, expected: ModTime>%v, actual: %v<=%v", oldTime, stat.ModTime(), oldTime)
+		}
+
+		assertFileSize(t)
+	})
 }
 
 func TestListLocalFiles(t *testing.T) {
