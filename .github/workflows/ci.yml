@@ -32,6 +32,8 @@ jobs:
           # Set up fixture S3 files
           make fixture
           make cover # run test with coverage
+        env:
+          AWS_REGION: ap-north-east-1 # for awscli
       - uses: codecov/codecov-action@v1
         with:
           file: ./cover.out
