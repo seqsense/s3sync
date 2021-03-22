@@ -10,6 +10,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+LOCALSTACK_VERSION = 0.12.7
+
 .PHONY: test
 test:
 	go test . -v
@@ -21,7 +24,11 @@ cover:
 
 .PHONY: s3
 s3:
-	docker run -p 4572:4566 -e SERVICES=s3 localstack/localstack
+	docker run -p 4572:4566 -e SERVICES=s3 localstack/localstack:$(LOCALSTACK_VERSION)
+
+.PHONY: s3-bg
+s3-bg:
+	docker run -d -p 4572:4566 -e SERVICES=s3 localstack/localstack:$(LOCALSTACK_VERSION)
 
 .PHONY: fixture
 fixture:
