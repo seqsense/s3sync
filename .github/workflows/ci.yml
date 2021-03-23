@@ -26,7 +26,7 @@ jobs:
       - name: Test
         run: |
           # Start mock s3 service
-          docker run -d -p 4572:4566 -e SERVICES=s3 localstack/localstack
+          make s3-bg
           while ! curl http://localhost:4572; do sleep 1; done
           sleep 5
           # Set up fixture S3 files
