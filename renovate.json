@@ -9,7 +9,7 @@
         "^Makefile$"
       ],
       "matchStrings": [
-        "^LOCALSTACK_VERSION\\s*=\\s*(?<currentValue>.*)"
+        "^LOCALSTACK_VERSION *= *(?<currentValue>.*)"
       ],
       "datasourceTemplate": "docker",
       "depNameTemplate": "localstack/localstack",
