@@ -21,15 +21,23 @@
   ],
   "packageRules": [
     {
-      "packagePatterns": ["^golang.org/x/"],
-      "schedule": ["on the first day of the month"]
+      "packagePatterns": [
+        "^golang.org/x/"
+      ],
+      "schedule": [
+        "on the first day of the month"
+      ]
     },
     {
-      "packagePatterns": ["^github.com/aws/aws-sdk-go"],
+      "packagePatterns": [
+        "^github.com/aws/aws-sdk-go"
+      ],
       "separateMinorPatch": true
     },
     {
-      "packagePatterns": ["^github.com/aws/aws-sdk-go"],
+      "packagePatterns": [
+        "^github.com/aws/aws-sdk-go"
+      ],
       "matchUpdateTypes": ["patch"],
       "automerge": true
     }
