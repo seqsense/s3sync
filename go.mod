@@ -4,5 +4,5 @@ go 1.15
 
 require (
 	github.com/aws/aws-sdk-go v1.40.18
-	github.com/gabriel-vasile/mimetype v1.3.0
+	github.com/gabriel-vasile/mimetype v1.3.1
 )
