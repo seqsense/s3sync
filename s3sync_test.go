@@ -37,6 +37,14 @@ func TestS3syncNotImplemented(t *testing.T) {
 	if err := m.Sync("s3://foo", "s3://bar"); err == nil {
 		t.Fatal("s3 to s3 sync is not implemented yet")
 	}
+
+	if _, err := m.HasDifference("foo", "bar"); err == nil {
+		t.Fatal("local to local file differences check is not supported")
+	}
+
+	if _, err := m.HasDifference("s3://foo", "s3://bar"); err == nil {
+		t.Fatal("s3 to s3 file differences check is not implemented yet")
+	}
 }
 
 func TestS3sync(t *testing.T) {
@@ -234,6 +242,150 @@ func TestS3sync(t *testing.T) {
 			objs[2].path != "foo/bar/test2.md" ||
 			objs[3].path != "foo/test.md" {
 			t.Error("Unexpected keys", objs)
+		}
+	})
+}
+
+func TestHasDifference(t *testing.T) {
+	t.Run("FileEmpty", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/empty")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/empty", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+	})
+
+	t.Run("FileOnly", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/file_only")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/file_only", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if !hasDiff {
+			t.Fatal("There should be difference in the files")
+		}
+
+		// Create a file in a temporary directory with the same contents as the dummy file.
+		data, err := ioutil.ReadFile(dummyFilename)
+		if err != nil {
+			t.Fatal("Failed to read", dummyFilename)
+		}
+		if err := ioutil.WriteFile(filepath.Join(temp, dummyFilename), data, 0644); err != nil {
+			t.Fatal("Failed to write", err)
+		}
+
+		hasDiff, err = New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/file_only")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/file_only", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+	})
+
+	t.Run("DirectoryOnly", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/directory_only")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/directory_only", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+	})
+
+	t.Run("FileAndDirectory", func(t *testing.T) {
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/file_and_directory")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/file_and_directory", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if !hasDiff {
+			t.Fatal("There should be difference in the files")
+		}
+
+		// Set the file structure to the same state as the destination.
+		if err := os.MkdirAll(filepath.Join(temp, "foo", "bar", "baz"), 0755); err != nil {
+			t.Fatal("Failed to mkdir", err)
+		}
+		data, err := ioutil.ReadFile(dummyFilename)
+		if err != nil {
+			t.Fatal("Failed to read", dummyFilename)
+		}
+		for _, file := range []string{
+			filepath.Join(temp, "foo", dummyFilename),
+			filepath.Join(temp, "foo", "bar", dummyFilename),
+			filepath.Join(temp, "foo", "bar", "baz", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, data, 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		hasDiff, err = New(getSession()).HasDifference(temp, "s3://example-bucket-check-file-difference/file_and_directory")
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+		hasDiff, err = New(getSession()).HasDifference("s3://example-bucket-check-file-difference/file_and_directory", temp)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
 		}
 	})
 }

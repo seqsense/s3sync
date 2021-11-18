@@ -49,3 +49,10 @@ fixture:
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-directory
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-mime
 	aws s3api --endpoint-url http://localhost:4572 put-object --bucket example-bucket-directory --key test/
+	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-check-file-difference
+	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-check-file-difference/file_and_directory/foo/
+	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-check-file-difference/file_and_directory/foo/bar/
+	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-check-file-difference/file_and_directory/foo/bar/baz/
+	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-check-file-difference/file_only/
+	aws s3api --endpoint-url http://localhost:4572 put-object --bucket example-bucket-check-file-difference --key empty/
+	aws s3api --endpoint-url http://localhost:4572 put-object --bucket example-bucket-check-file-difference --key directory_only/foo/
