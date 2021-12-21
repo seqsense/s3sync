@@ -58,7 +58,6 @@ type fileInfo struct {
 	lastModified   time.Time
 	singleFile     bool
 	existsInSource bool
-	hash           string
 }
 
 type fileOp struct {
@@ -67,10 +66,9 @@ type fileOp struct {
 }
 
 type checkFiles struct {
-	sourceFile     *fileInfo
-	destFile       *fileInfo
-	destFileExists bool
-	err            error
+	sourceFile *fileInfo
+	destFile   *fileInfo
+	err        error
 }
 
 // New returns a new Manager.
@@ -271,70 +269,62 @@ func (m *Manager) hasDifferenceS3ToS3(chJob chan func(), sourcePath, destPath *s
 
 func (m *Manager) hasDifferenceLocalToS3(chJob chan func(), sourcePath string, destPath *s3Path) (bool, error) {
 	wg := &sync.WaitGroup{}
-	hasDifference := &filesDifference{}
+	var hasDifference bool
 	errs := &multiErr{}
 
-	for checkFiles := range filterFilesForHasDifference(
+	for files := range filterFilesForHasDifference(
 		listLocalFiles(sourcePath), m.listS3Files(destPath),
 	) {
 		wg.Add(1)
-		checkFiles := checkFiles
+		files := files
 		chJob <- func() {
 			defer wg.Done()
-			if checkFiles.err != nil {
-				errs.Append(checkFiles.err)
+			if files.err != nil {
+				errs.Append(files.err)
 				return
 			}
-
-			if !checkFiles.destFileExists {
-				hasDifference.Set(true)
+			notEqual, err := hasDifferenceFile(files)
+			if err != nil {
+				errs.Append(files.err)
 				return
-			}
-
-			if isEqual, err := isEqualFile(checkFiles.sourceFile, checkFiles.destFile); err != nil {
-				errs.Append(err)
-			} else if !isEqual {
-				hasDifference.Set(true)
+			} else if notEqual {
+				hasDifference = true
 			}
 		}
 	}
 	wg.Wait()
 
-	return hasDifference.Get(), errs.ErrOrNil()
+	return hasDifference, errs.ErrOrNil()
 }
 
 func (m *Manager) hasDifferenceS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath string) (bool, error) {
 	wg := &sync.WaitGroup{}
-	hasDifference := &filesDifference{}
+	var hasDifference bool
 	errs := &multiErr{}
 
-	for checkFiles := range filterFilesForHasDifference(
+	for files := range filterFilesForHasDifference(
 		m.listS3Files(sourcePath), listLocalFiles(destPath),
 	) {
 		wg.Add(1)
-		checkFiles := checkFiles
+		files := files
 		chJob <- func() {
 			defer wg.Done()
-			if checkFiles.err != nil {
-				errs.Append(checkFiles.err)
+			if files.err != nil {
+				errs.Append(files.err)
 				return
 			}
-
-			if !checkFiles.destFileExists {
-				hasDifference.Set(true)
+			notEqual, err := hasDifferenceFile(files)
+			if err != nil {
+				errs.Append(files.err)
 				return
-			}
-
-			if isEqual, err := isEqualFile(checkFiles.sourceFile, checkFiles.destFile); err != nil {
-				errs.Append(err)
-			} else if !isEqual {
-				hasDifference.Set(true)
+			} else if notEqual {
+				hasDifference = true
 			}
 		}
 	}
 	wg.Wait()
 
-	return hasDifference.Get(), errs.ErrOrNil()
+	return hasDifference, errs.ErrOrNil()
 }
 
 func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
@@ -529,7 +519,6 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 				size:         *object.Size,
 				lastModified: *object.LastModified,
 				singleFile:   true,
-				hash:         strings.Replace(*object.ETag, "\"", "", -1),
 			}
 		} else {
 			c <- &fileInfo{
@@ -537,7 +526,6 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 				path:         *object.Key,
 				size:         *object.Size,
 				lastModified: *object.LastModified,
-				hash:         strings.Replace(*object.ETag, "\"", "", -1),
 			}
 		}
 	}
@@ -627,7 +615,7 @@ func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) c
 			// 1. The dest doesn't exist
 			// 2. The dest doesn't have the same size as the source
 			// 3. The dest is older than the source
-			if !ok || sourceInfo.size != destInfo.size || sourceInfo.lastModified.After(destInfo.lastModified) {
+			if !ok || isSyncTargetFile(sourceInfo, destInfo) {
 				c <- &fileOp{fileInfo: sourceInfo}
 			}
 			if ok {
@@ -664,13 +652,13 @@ func filterFilesForHasDifference(sourceFileChan, destFileChan chan *fileInfo) ch
 			destInfo, ok := destFiles[sourceInfo.name]
 			if ok {
 				c <- &checkFiles{
-					sourceFile:     sourceInfo,
-					destFile:       destInfo,
-					destFileExists: true,
+					sourceFile: sourceInfo,
+					destFile:   destInfo,
 				}
 			} else {
-				println(fmt.Sprintf("The %s file does not exist in the destination to be compared", sourceInfo.name))
-				c <- &checkFiles{destFileExists: false}
+				c <- &checkFiles{
+					sourceFile: sourceInfo,
+				}
 			}
 		}
 	}()
@@ -692,34 +680,28 @@ func fileInfoChanToMap(files chan *fileInfo) (map[string]*fileInfo, error) {
 	return result, nil
 }
 
-// isEqualFile use file size and hash value to check for identical files.
-func isEqualFile(sourceFile, destFile *fileInfo) (bool, error) {
-	println(fmt.Sprintf("Checking File source:%s dest:%s", sourceFile.path, destFile.path))
-
-	// check file size
-	if sourceFile.size != destFile.size {
-		println(fmt.Sprintf("The size of the %s file does not match", sourceFile.name))
-		return false, nil
+// hasDifferenceFile checks for differences in the specified file.
+func hasDifferenceFile(checkFiles *checkFiles) (bool, error) {
+	switch {
+	case checkFiles == nil || checkFiles.sourceFile == nil:
+		return false, errors.New("missing information needed to compare files")
+	case checkFiles.destFile == nil:
+		println(fmt.Sprintf("file %s does not exist at the comparison destination", checkFiles.sourceFile.name))
+		return true, nil
+	case isSyncTargetFile(checkFiles.sourceFile, checkFiles.destFile):
+		println(fmt.Sprintf("the %s file statuses of the source and destination files do not match", checkFiles.sourceFile.name))
+		return true, nil
 	}
+	return false, nil
+}
 
-	// check file hash
-	if sourceFile.hash == "" {
-		h, err := getMd5Hash(sourceFile.path)
-		if err != nil {
-			return false, err
-		}
-		sourceFile.hash = h
-	} else if destFile.hash == "" {
-		h, err := getMd5Hash(destFile.path)
-		if err != nil {
-			return false, err
-		}
-		destFile.hash = h
+// isSyncTargetFile determines if the target file should be updated based on the source file to be compared.
+// If either file to be compared is nil, return false.
+func isSyncTargetFile(sourceFile, destFile *fileInfo) bool {
+	if sourceFile == nil || destFile == nil {
+		return false
+	} else if sourceFile.size != destFile.size || sourceFile.lastModified.After(destFile.lastModified) {
+		return true
 	}
-	if sourceFile.hash != destFile.hash {
-		println(fmt.Sprintf("The hash values in the %s file do not match", sourceFile.name))
-		return false, nil
-	}
-
-	return true, nil
+	return false
 }
