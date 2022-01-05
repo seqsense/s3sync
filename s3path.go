@@ -16,6 +16,7 @@ package s3sync
 import (
 	"errors"
 	"net/url"
+	"path/filepath"
 	"strings"
 )
 
@@ -32,8 +33,9 @@ func urlToS3Path(url *url.URL) (*s3Path, error) {
 	}
 
 	return &s3Path{
-		bucket:       url.Host,
-		bucketPrefix: strings.TrimPrefix(url.Path, "/"),
+		bucket: url.Host,
+		// Using filepath.ToSlash for change backslash to slash on Windows
+		bucketPrefix: strings.TrimPrefix(filepath.ToSlash(url.Path), "/"),
 	}, nil
 }
 
