@@ -232,7 +232,8 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if file.singleFile {
 		sourceFile = file.name
 	} else {
-		sourceFile = filepath.Join(sourcePath.bucketPrefix, file.name)
+		// Using filepath.ToSlash for change backslash to slash on Windows
+		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
 	_, err = s3manager.NewDownloaderWithClient(
@@ -282,7 +283,8 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
-		destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+		// Using filepath.ToSlash for change backslash to slash on Windows
+		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
 	}
 
 	println("Uploading", file.name, "to", destFile.String())
@@ -332,7 +334,8 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
-		destFile.bucketPrefix = filepath.Join(destPath.bucketPrefix, file.name)
+		// Using filepath.ToSlash for change backslash to slash on Windows
+		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
 	}
 
 	println("Deleting", destFile.String())
