@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/gobwas/glob"
 )
 
 // Manager manages the sync operation.
@@ -35,6 +36,7 @@ type Manager struct {
 	nJobs          int
 	del            bool
 	dryrun         bool
+	exclude        []glob.Glob
 	acl            *string
 	guessMime      bool
 	contentType    *string
@@ -143,7 +145,7 @@ func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(
-		listLocalFiles(sourcePath), m.listS3Files(destPath), m.del,
+		listLocalFiles(sourcePath), m.listS3Files(destPath), m.del, m.exclude,
 	) {
 		wg.Add(1)
 		source := source
@@ -175,7 +177,7 @@ func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath 
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(
-		m.listS3Files(sourcePath), listLocalFiles(destPath), m.del,
+		m.listS3Files(sourcePath), listLocalFiles(destPath), m.del, m.exclude,
 	) {
 		wg.Add(1)
 		source := source
@@ -384,6 +386,7 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 			// Skip directory like object
 			continue
 		}
+
 		name, err := filepath.Rel(path.bucketPrefix, *object.Key)
 		if err != nil {
 			sendErrorInfoToChannel(c, err)
@@ -476,7 +479,7 @@ func sendErrorInfoToChannel(c chan *fileInfo, err error) {
 
 // filterFilesForSync filters the source files from the given destination files, and returns
 // another channel which includes the files necessary to be synced.
-func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) chan *fileOp {
+func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool, excludePatterns []glob.Glob) chan *fileOp {
 	c := make(chan *fileOp)
 
 	destFiles, err := fileInfoChanToMap(destFileChan)
@@ -488,6 +491,20 @@ func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) c
 			return
 		}
 		for sourceInfo := range sourceFileChan {
+			exclude := func(name string, patterns []glob.Glob) bool {
+				for _, pattern := range patterns {
+					if pattern.Match(sourceInfo.name) {
+						return true
+					}
+				}
+
+				return false
+			}
+
+			if exclude(sourceInfo.name, excludePatterns) {
+				continue
+			}
+
 			destInfo, ok := destFiles[sourceInfo.name]
 			// source is necessary to sync if
 			// 1. The dest doesn't exist

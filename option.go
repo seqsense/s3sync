@@ -13,7 +13,10 @@
 
 package s3sync
 
-import "github.com/aws/aws-sdk-go/service/s3/s3manager"
+import (
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/gobwas/glob"
+)
 
 const (
 	// Default number of parallel file sync jobs.
@@ -49,6 +52,13 @@ func WithACL(acl string) Option {
 func WithDryRun() Option {
 	return func(m *Manager) {
 		m.dryrun = true
+	}
+}
+
+// WithExcludePattern will exclude files from the sync.
+func WithExcludePattern(pattern string) Option {
+	return func(m *Manager) {
+		m.exclude = append(m.exclude, glob.MustCompile(pattern))
 	}
 }
 
