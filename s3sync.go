@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/at-wat/s3iot"
-	"github.com/at-wat/s3iot/awssdkv2"
+	"github.com/at-wat/s3iot/awss3v2"
 	"github.com/at-wat/s3iot/s3api"
 	"github.com/at-wat/s3iot/s3iotiface"
 
@@ -74,10 +74,10 @@ func New(cfg aws.Config, options ...Option) *Manager {
 }
 
 func newFromS3ClientV2(s3cli *s3.Client, options ...Option) *Manager {
-	s3api := awssdkv2.NewAPI(s3cli)
+	s3api := awss3v2.NewAPI(s3cli)
 	return NewFromAPI(s3iotiface.CombineUpDownloader(
-		awssdkv2.NewAWSSDKUploader(manager.NewUploader(s3cli)),
-		awssdkv2.NewAWSSDKDownloader(manager.NewDownloader(s3cli)),
+		awss3v2.NewAWSSDKUploader(manager.NewUploader(s3cli)),
+		awss3v2.NewAWSSDKDownloader(manager.NewDownloader(s3cli)),
 	), s3api, options...)
 }
 

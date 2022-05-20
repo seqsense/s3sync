@@ -68,7 +68,7 @@ s3sync.new(sess, s3sync.WithParallel(1)) // You can sync one by one.
 
 ```go
 import (
-  "github.com/at-wat/s3iot/awssdkv1"
+  "github.com/at-wat/s3iot/awss3v1"
   "github.com/aws/aws-sdk-go/aws"
   "github.com/aws/aws-sdk-go/aws/session"
   "github.com/aws/aws-sdk-go/service/s3"
@@ -84,9 +84,9 @@ func main() {
 
   // Initialize s3sync.Manager using aws-sdk-go (v1)
   syncManager := s3sync.NewFromAPI(s3iotiface.CombineUpDownloader(
-    awssdkv1.NewAWSSDKUploader(s3manager.NewUploaderWithClient(cli)),
-    awssdkv1.NewAWSSDKDownloader(s3manager.NewDownloaderWithClient(cli)),
-  ), awssdkv1.NewAPI(cli))
+    awss3v1.NewAWSSDKUploader(s3manager.NewUploaderWithClient(cli)),
+    awss3v1.NewAWSSDKDownloader(s3manager.NewDownloaderWithClient(cli)),
+  ), awss3v1.NewAPI(cli))
 
   // ...
 ```
