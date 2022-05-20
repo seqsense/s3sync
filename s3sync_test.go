@@ -10,11 +10,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package s3sync
 
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -28,13 +30,13 @@ import (
 const dummyFilename = "README.md"
 
 func TestS3syncNotImplemented(t *testing.T) {
-	m := New(getSession())
+	m := newManager()
 
-	if err := m.Sync("foo", "bar"); err == nil {
+	if err := m.Sync(context.Background(), "foo", "bar"); err == nil {
 		t.Fatal("local to local sync is not supported")
 	}
 
-	if err := m.Sync("s3://foo", "s3://bar"); err == nil {
+	if err := m.Sync(context.Background(), "s3://foo", "s3://bar"); err == nil {
 		t.Fatal("s3 to s3 sync is not implemented yet")
 	}
 }
@@ -72,7 +74,7 @@ func TestS3sync(t *testing.T) {
 		// │       └── README.md
 		// └── foo
 		//     └── README.md
-		if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket", temp); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -96,7 +98,7 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Failed to create temp dir")
 		}
 
-		if err := New(getSession()).Sync("s3://example-bucket-directory", temp); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket-directory", temp); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 	})
@@ -115,15 +117,15 @@ func TestS3sync(t *testing.T) {
 		}
 
 		// Download to ./README.md
-		if err := New(getSession()).Sync("s3://example-bucket/README.md", temp+"/"); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket/README.md", temp+"/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 		// Download to ./foo/README.md
-		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "foo")+"/"); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket/README.md", filepath.Join(temp, "foo")+"/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 		// Download to ./test.md
-		if err := New(getSession()).Sync("s3://example-bucket/README.md", filepath.Join(temp, "test.md")); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket/README.md", filepath.Join(temp, "test.md")); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -159,7 +161,7 @@ func TestS3sync(t *testing.T) {
 			}
 		}
 
-		if err := New(getSession()).Sync(temp, "s3://example-bucket-upload"); err != nil {
+		if err := newManager().Sync(context.Background(), temp, "s3://example-bucket-upload"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -201,22 +203,22 @@ func TestS3sync(t *testing.T) {
 		}
 
 		// Copy README.md to s3://example-bucket-upload-file/README.md
-		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file"); err != nil {
+		if err := newManager().Sync(context.Background(), filePath, "s3://example-bucket-upload-file"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
 		// Copy README.md to s3://example-bucket-upload-file/foo/README.md
-		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file/foo/"); err != nil {
+		if err := newManager().Sync(context.Background(), filePath, "s3://example-bucket-upload-file/foo/"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
 		// Copy README.md to s3://example-bucket-upload-file/foo/test.md
-		if err := New(getSession()).Sync(filePath, "s3://example-bucket-upload-file/foo/test.md"); err != nil {
+		if err := newManager().Sync(context.Background(), filePath, "s3://example-bucket-upload-file/foo/test.md"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
 		// Copy foo/README.md to s3://example-bucket-upload-file/foo/bar/test.md
-		if err := New(getSession()).Sync(filePath2, "s3://example-bucket-upload-file/foo/bar/test2.md"); err != nil {
+		if err := newManager().Sync(context.Background(), filePath2, "s3://example-bucket-upload-file/foo/bar/test2.md"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -260,7 +262,8 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete()).Sync(
+		if err := newManager(WithDelete()).Sync(
+			context.Background(),
 			"s3://example-bucket", temp,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -288,7 +291,8 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete()).Sync(
+		if err := newManager(WithDelete()).Sync(
+			context.Background(),
 			"s3://example-bucket/dest_only_file", destOnlyFilename,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -324,9 +328,7 @@ func TestDelete(t *testing.T) {
 			}
 		}
 
-		if err := New(
-			getSession(), WithDelete(),
-		).Sync(temp, "s3://example-bucket-delete"); err != nil {
+		if err := newManager(WithDelete()).Sync(context.Background(), temp, "s3://example-bucket-delete"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -353,9 +355,10 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Failed to create temp dir")
 		}
 
-		if err := New(
-			getSession(), WithDelete(),
-		).Sync(filepath.Join(temp, "dest_only_file"), "s3://example-bucket-delete-file/dest_only_file"); err != nil {
+		if err := newManager(WithDelete()).Sync(
+			context.Background(),
+			filepath.Join(temp, "dest_only_file"), "s3://example-bucket-delete-file/dest_only_file",
+		); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -394,7 +397,8 @@ func TestDryRun(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete(), WithDryRun()).Sync(
+		if err := newManager(WithDelete(), WithDryRun()).Sync(
+			context.Background(),
 			"s3://example-bucket", temp,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -438,9 +442,7 @@ func TestDryRun(t *testing.T) {
 			}
 		}
 
-		if err := New(
-			getSession(), WithDelete(), WithDryRun(),
-		).Sync(temp, "s3://example-bucket-dryrun"); err != nil {
+		if err := newManager(WithDelete(), WithDryRun()).Sync(context.Background(), temp, "s3://example-bucket-dryrun"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -486,7 +488,7 @@ func TestPartialS3sync(t *testing.T) {
 	t.Run("DestinationEmpty", func(t *testing.T) {
 		atomic.StoreUint32(&syncCount, 0)
 
-		if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+		if err := newManager().Sync(context.Background(), "s3://example-bucket", temp); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -502,7 +504,7 @@ func TestPartialS3sync(t *testing.T) {
 
 		os.RemoveAll(filepath.Join(temp, "foo"))
 
-		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+		if newManager().Sync(context.Background(), "s3://example-bucket", temp) != nil {
 			t.Fatal("Sync should be successful")
 		}
 
@@ -520,7 +522,7 @@ func TestPartialS3sync(t *testing.T) {
 		filename := filepath.Join(temp, "README.md")
 		os.Chtimes(filename, oldTime, oldTime)
 
-		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+		if newManager().Sync(context.Background(), "s3://example-bucket", temp) != nil {
 			t.Fatal("Sync should be successful")
 		}
 
@@ -661,7 +663,7 @@ func TestS3sync_GuessMime(t *testing.T) {
 		},
 		"NoGuess": {
 			options:  []Option{WithoutGuessMimeType()},
-			expected: "binary/octet-stream",
+			expected: "application/octet-stream",
 		},
 		"Overwrite": {
 			options:  []Option{WithContentType("test/dummy")},
@@ -673,7 +675,7 @@ func TestS3sync_GuessMime(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			deleteObject(t, "example-bucket-mime", dummyFilename)
 
-			if err := New(getSession(), tt.options...).Sync(temp, "s3://example-bucket-mime"); err != nil {
+			if err := newManager(tt.options...).Sync(context.Background(), temp, "s3://example-bucket-mime"); err != nil {
 				t.Fatal("Sync should be successful", err)
 			}
 

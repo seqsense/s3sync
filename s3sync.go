@@ -10,9 +10,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package s3sync
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"os"
@@ -21,25 +23,27 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/at-wat/s3iot"
+	"github.com/at-wat/s3iot/awssdkv2"
+	"github.com/at-wat/s3iot/s3api"
+	"github.com/at-wat/s3iot/s3iotiface"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gabriel-vasile/mimetype"
 )
 
 // Manager manages the sync operation.
 type Manager struct {
-	s3             s3iface.S3API
-	nJobs          int
-	del            bool
-	dryrun         bool
-	acl            *string
-	guessMime      bool
-	contentType    *string
-	downloaderOpts []func(*s3manager.Downloader)
-	uploaderOpts   []func(*s3manager.Uploader)
+	updownloader s3iotiface.UpDownloader
+	s3           s3api.S3API
+	nJobs        int
+	del          bool
+	dryrun       bool
+	acl          *string
+	guessMime    bool
+	contentType  *string
 }
 
 type operation int
@@ -65,11 +69,25 @@ type fileOp struct {
 }
 
 // New returns a new Manager.
-func New(sess *session.Session, options ...Option) *Manager {
+func New(cfg aws.Config, options ...Option) *Manager {
+	return newFromS3ClientV2(s3.NewFromConfig(cfg), options...)
+}
+
+func newFromS3ClientV2(s3cli *s3.Client, options ...Option) *Manager {
+	s3api := awssdkv2.NewAPI(s3cli)
+	return NewFromAPI(s3iotiface.CombineUpDownloader(
+		awssdkv2.NewAWSSDKUploader(manager.NewUploader(s3cli)),
+		awssdkv2.NewAWSSDKDownloader(manager.NewDownloader(s3cli)),
+	), s3api, options...)
+}
+
+// NewFromAPI creates a new Manager using underlying API interfaces.
+func NewFromAPI(updownloader s3iotiface.UpDownloader, s3 s3api.S3API, options ...Option) *Manager {
 	m := &Manager{
-		s3:        s3.New(sess),
-		nJobs:     DefaultParallel,
-		guessMime: true,
+		s3:           s3,
+		updownloader: updownloader,
+		nJobs:        DefaultParallel,
+		guessMime:    true,
 	}
 	for _, o := range options {
 		o(m)
@@ -78,7 +96,7 @@ func New(sess *session.Session, options ...Option) *Manager {
 }
 
 // Sync syncs the files between s3 and local disks.
-func (m *Manager) Sync(source, dest string) error {
+func (m *Manager) Sync(ctx context.Context, source, dest string) error {
 	sourceURL, err := url.Parse(source)
 	if err != nil {
 		return err
@@ -115,9 +133,9 @@ func (m *Manager) Sync(source, dest string) error {
 			if err != nil {
 				return err
 			}
-			return m.syncS3ToS3(chJob, sourceS3Path, destS3Path)
+			return m.syncS3ToS3(ctx, chJob, sourceS3Path, destS3Path)
 		}
-		return m.syncS3ToLocal(chJob, sourceS3Path, dest)
+		return m.syncS3ToLocal(ctx, chJob, sourceS3Path, dest)
 	}
 
 	if isS3URL(destURL) {
@@ -125,7 +143,7 @@ func (m *Manager) Sync(source, dest string) error {
 		if err != nil {
 			return err
 		}
-		return m.syncLocalToS3(chJob, source, destS3Path)
+		return m.syncLocalToS3(ctx, chJob, source, destS3Path)
 	}
 
 	return errors.New("local to local sync is not supported")
@@ -135,15 +153,15 @@ func isS3URL(url *url.URL) bool {
 	return url.Scheme == "s3"
 }
 
-func (m *Manager) syncS3ToS3(chJob chan func(), sourcePath, destPath *s3Path) error {
+func (m *Manager) syncS3ToS3(ctx context.Context, chJob chan func(), sourcePath, destPath *s3Path) error {
 	return errors.New("S3 to S3 sync feature is not implemented")
 }
 
-func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *s3Path) error {
+func (m *Manager) syncLocalToS3(ctx context.Context, chJob chan func(), sourcePath string, destPath *s3Path) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(
-		listLocalFiles(sourcePath), m.listS3Files(destPath), m.del,
+		listLocalFiles(sourcePath), m.listS3Files(ctx, destPath), m.del,
 	) {
 		wg.Add(1)
 		source := source
@@ -155,11 +173,11 @@ func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *
 			}
 			switch source.op {
 			case opUpdate:
-				if err := m.upload(source.fileInfo, sourcePath, destPath); err != nil {
+				if err := m.upload(ctx, source.fileInfo, sourcePath, destPath); err != nil {
 					errs.Append(err)
 				}
 			case opDelete:
-				if err := m.deleteRemote(source.fileInfo, destPath); err != nil {
+				if err := m.deleteRemote(ctx, source.fileInfo, destPath); err != nil {
 					errs.Append(err)
 				}
 			}
@@ -171,11 +189,11 @@ func (m *Manager) syncLocalToS3(chJob chan func(), sourcePath string, destPath *
 }
 
 // syncS3ToLocal syncs the given s3 path to the given local path.
-func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath string) error {
+func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePath *s3Path, destPath string) error {
 	wg := &sync.WaitGroup{}
 	errs := &multiErr{}
 	for source := range filterFilesForSync(
-		m.listS3Files(sourcePath), listLocalFiles(destPath), m.del,
+		m.listS3Files(ctx, sourcePath), listLocalFiles(destPath), m.del,
 	) {
 		wg.Add(1)
 		source := source
@@ -187,11 +205,11 @@ func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath 
 			}
 			switch source.op {
 			case opUpdate:
-				if err := m.download(source.fileInfo, sourcePath, destPath); err != nil {
+				if err := m.download(ctx, source.fileInfo, sourcePath, destPath); err != nil {
 					errs.Append(err)
 				}
 			case opDelete:
-				if err := m.deleteLocal(source.fileInfo, destPath); err != nil {
+				if err := m.deleteLocal(ctx, source.fileInfo, destPath); err != nil {
 					errs.Append(err)
 				}
 			}
@@ -202,7 +220,7 @@ func (m *Manager) syncS3ToLocal(chJob chan func(), sourcePath *s3Path, destPath 
 	return errs.ErrOrNil()
 }
 
-func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
+func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath string) error {
 	var targetFilename string
 	if !strings.HasSuffix(destPath, "/") && file.singleFile {
 		// Destination path is not a directory and source is a single file.
@@ -236,14 +254,15 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
-	_, err = s3manager.NewDownloaderWithClient(
-		m.s3,
-		m.downloaderOpts...,
-	).Download(writer, &s3.GetObjectInput{
-		Bucket: aws.String(sourcePath.bucket),
-		Key:    aws.String(sourceFile),
+	dc, err := m.updownloader.Download(ctx, writer, &s3iot.DownloadInput{
+		Bucket: &sourcePath.bucket,
+		Key:    &sourceFile,
 	})
 	if err != nil {
+		return err
+	}
+	<-dc.Done()
+	if _, err = dc.Result(); err != nil {
 		return err
 	}
 
@@ -255,7 +274,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	return nil
 }
 
-func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
+func (m *Manager) deleteLocal(ctx context.Context, file *fileInfo, destPath string) error {
 	var targetFilename string
 	if !strings.HasSuffix(destPath, "/") && file.singleFile {
 		// Destination path is not a directory and source is a single file.
@@ -272,7 +291,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	return os.Remove(targetFilename)
 }
 
-func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
+func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string, destPath *s3Path) error {
 	var sourceFilename string
 	if file.singleFile {
 		sourceFilename = sourcePath
@@ -312,25 +331,22 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
-	_, err = s3manager.NewUploaderWithClient(
-		m.s3,
-		m.uploaderOpts...,
-	).Upload(&s3manager.UploadInput{
-		Bucket:      aws.String(destFile.bucket),
-		Key:         aws.String(destFile.bucketPrefix),
+	uc, err := m.updownloader.Upload(ctx, &s3iot.UploadInput{
+		Bucket:      &destFile.bucket,
+		Key:         &destFile.bucketPrefix,
 		ACL:         m.acl,
 		Body:        reader,
 		ContentType: contentType,
 	})
-
 	if err != nil {
 		return err
 	}
-
-	return nil
+	<-uc.Done()
+	_, err = uc.Result()
+	return err
 }
 
-func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
+func (m *Manager) deleteRemote(ctx context.Context, file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
@@ -343,22 +359,22 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 		return nil
 	}
 
-	_, err := m.s3.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(destFile.bucket),
-		Key:    aws.String(destFile.bucketPrefix),
+	_, err := m.s3.DeleteObject(ctx, &s3api.DeleteObjectInput{
+		Bucket: &destFile.bucket,
+		Key:    &destFile.bucketPrefix,
 	})
 	return err
 }
 
 // listS3Files return a channel which receives the file infos under the given s3Path.
-func (m *Manager) listS3Files(path *s3Path) chan *fileInfo {
+func (m *Manager) listS3Files(ctx context.Context, path *s3Path) chan *fileInfo {
 	c := make(chan *fileInfo, 50000) // TODO: revisit this buffer size later
 
 	go func() {
 		defer close(c)
 		var token *string
 		for {
-			if token = m.listS3FileWithToken(c, path, token); token == nil {
+			if token = m.listS3FileWithToken(ctx, c, path, token); token == nil {
 				break
 			}
 		}
@@ -368,8 +384,8 @@ func (m *Manager) listS3Files(path *s3Path) chan *fileInfo {
 }
 
 // listS3FileWithToken lists (send to the result channel) the s3 files from the given continuation token.
-func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *string) *string {
-	list, err := m.s3.ListObjectsV2(&s3.ListObjectsV2Input{
+func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, path *s3Path, token *string) *string {
+	list, err := m.s3.ListObjects(ctx, &s3api.ListObjectsInput{
 		Bucket:            &path.bucket,
 		Prefix:            &path.bucketPrefix,
 		ContinuationToken: token,
@@ -394,7 +410,7 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 			c <- &fileInfo{
 				name:         filepath.Base(*object.Key),
 				path:         filepath.Dir(*object.Key),
-				size:         *object.Size,
+				size:         object.Size,
 				lastModified: *object.LastModified,
 				singleFile:   true,
 			}
@@ -402,7 +418,7 @@ func (m *Manager) listS3FileWithToken(c chan *fileInfo, path *s3Path, token *str
 			c <- &fileInfo{
 				name:         name,
 				path:         *object.Key,
-				size:         *object.Size,
+				size:         object.Size,
 				lastModified: *object.LastModified,
 			}
 		}

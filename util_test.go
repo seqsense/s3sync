@@ -10,27 +10,49 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package s3sync
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-func getSession() *session.Session {
-	sess, _ := session.NewSession(&aws.Config{
-		Region:           aws.String("ap-northeast-1"),
-		S3ForcePathStyle: aws.Bool(true),
-		Endpoint:         aws.String("http://localhost:4572"),
-	})
-	return sess
+func getConfig() aws.Config {
+	return aws.Config{
+		Region: "ap-northeast-1",
+		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				URL:           "http://localhost:4572",
+				PartitionID:   "localstack",
+				SigningRegion: region,
+				SigningName:   service,
+				SigningMethod: "v4",
+			}, nil
+		}),
+		Credentials: credentials.NewStaticCredentialsProvider(
+			"ASIAZZZZZZZZZZZZZZZZ",
+			"0000000000000000000000000000000000000000",
+			"",
+		),
+	}
+}
+
+func usePathStyle(o *s3.Options) {
+	o.UsePathStyle = true
+}
+
+func newManager(options ...Option) *Manager {
+	cli := s3.NewFromConfig(getConfig(), usePathStyle)
+	return newFromS3ClientV2(cli, options...)
 }
 
 type s3Object struct {
@@ -52,13 +74,9 @@ func (l s3ObjectList) Swap(i, j int) {
 }
 
 func deleteObject(t *testing.T, bucket, key string) {
-	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String("test"),
-		Endpoint:         aws.String("http://localhost:4572"),
-		S3ForcePathStyle: aws.Bool(true),
-	}))
+	svc := s3.NewFromConfig(getConfig(), usePathStyle)
 
-	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
+	_, err := svc.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	})
@@ -68,22 +86,18 @@ func deleteObject(t *testing.T, bucket, key string) {
 }
 
 func listObjectsSorted(t *testing.T, bucket string) []s3Object {
-	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String("test"),
-		Endpoint:         aws.String("http://localhost:4572"),
-		S3ForcePathStyle: aws.Bool(true),
-	}))
+	svc := s3.NewFromConfig(getConfig(), usePathStyle)
 
-	result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+	result, err := svc.ListObjectsV2(context.Background(), &s3.ListObjectsV2Input{
 		Bucket:  &bucket,
-		MaxKeys: aws.Int64(100),
+		MaxKeys: 100,
 	})
 	if err != nil {
 		t.Fatal("ListObjects failed", err)
 	}
 	var objs []s3Object
 	for _, obj := range result.Contents {
-		o, err := svc.GetObject(&s3.GetObjectInput{
+		o, err := svc.GetObject(context.Background(), &s3.GetObjectInput{
 			Bucket: &bucket,
 			Key:    obj.Key,
 		})
@@ -92,7 +106,7 @@ func listObjectsSorted(t *testing.T, bucket string) []s3Object {
 		}
 		objs = append(objs, s3Object{
 			path:        *obj.Key,
-			size:        int(*obj.Size),
+			size:        int(obj.Size),
 			contentType: *o.ContentType,
 		})
 	}
