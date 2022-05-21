@@ -9,9 +9,11 @@
 
 ## v2
 
-- Default AWS SDK is updated to aws-sdk-go-v2.
-  You can still use aws-sdk-go (v1) [by this code](#using-aws-sdk-go-v1).
 - `Sync()` receives `context.Context` as a first argument.
+- Default AWS SDK is updated to aws-sdk-go-v2.
+  See an [example](examples/awssdkv1/example.go) how to use aws-sdk-go (v1) in your code.
+- `WithDownloaderOptions()` and `WithUploaderOptions()` are removed.
+  See an [example](examples/parallel/example.go) how to set uploader/downloader options.
 
 # Usage
 
@@ -43,53 +45,27 @@ func main() {
 
 ## Setting the custom logger
 
-You can set your custom logger.
+You can globally set your custom logger.
 
 ```go
-import "github.com/seqsense/s3sync"
-
-...
 s3sync.SetLogger(&CustomLogger{})
-...
 ```
 
 The logger needs to implement `Log` and `Logf` methods. See the godoc for details.
 
+[example code](examples/logger/example.go)
+
 ## Setting up the parallelism
 
 You can configure the number of parallel jobs for sync. Default is 16.
-
-```
-s3sync.new(sess, s3sync.WithParallel(16)) // This is the same as default.
-s3sync.new(sess, s3sync.WithParallel(1)) // You can sync one by one.
-```
-
-## Using aws-sdk-go v1
+Note that each file may be transferred in parallel according to the underlying uploader/downloader implementation.
 
 ```go
-import (
-  "github.com/at-wat/s3iot/awss3v1"
-  "github.com/aws/aws-sdk-go/aws"
-  "github.com/aws/aws-sdk-go/aws/session"
-  "github.com/aws/aws-sdk-go/service/s3"
-  "github.com/aws/aws-sdk-go/service/s3manager"
-)
-
-func main() {
-  // Creates an AWS session
-  sess, _ := session.NewSession(&aws.Config{
-    Region: aws.String("us-east-1"),
-  })
-  cli := s3.New(sess)
-
-  // Initialize s3sync.Manager using aws-sdk-go (v1)
-  syncManager := s3sync.NewFromAPI(s3iotiface.CombineUpDownloader(
-    awss3v1.NewAWSSDKUploader(s3manager.NewUploaderWithClient(cli)),
-    awss3v1.NewAWSSDKDownloader(s3manager.NewDownloaderWithClient(cli)),
-  ), awss3v1.NewAPI(cli))
-
-  // ...
+s3sync.New(cfg, s3sync.WithParallel(16)) // This is the same as default.
+s3sync.New(cfg, s3sync.WithParallel(1))  // You can sync one by one.
 ```
+
+[example code](examples/parallel/example.go)
 
 # License
 
