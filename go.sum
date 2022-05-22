@@ -1,7 +1,7 @@
-github.com/at-wat/s3iot v0.0.4-0.20220520120143-08c4b16bd66f h1:1EW0EE0cRrMDR+KDsyE7gKR4YuumqDH1AcbgaOjgmQc=
-github.com/at-wat/s3iot v0.0.4-0.20220520120143-08c4b16bd66f/go.mod h1:YPOaNPuLeB9OzXQkgQEPakrIHIfKIb+TwJRvAh5+FaI=
-github.com/at-wat/s3iot/awss3v2 v0.0.4-0.20220520120143-08c4b16bd66f h1:9X1zEU9gA/Y0eFWnh4+0+2bcQXvFdx7LxfdD2zquzP0=
-github.com/at-wat/s3iot/awss3v2 v0.0.4-0.20220520120143-08c4b16bd66f/go.mod h1:Fxd7VVR+YIZziCfQiT729+ps5NZ3U5BmyoMeJDDLWec=
+github.com/at-wat/s3iot v0.0.4-0.20220522124335-89d02b4a6da6 h1:fPIM67BXHwYtDDL/BcfZQVw4L1tW1qoOXY7eEYzffec=
+github.com/at-wat/s3iot v0.0.4-0.20220522124335-89d02b4a6da6/go.mod h1:YPOaNPuLeB9OzXQkgQEPakrIHIfKIb+TwJRvAh5+FaI=
+github.com/at-wat/s3iot/awss3v2 v0.0.4-0.20220522124335-89d02b4a6da6 h1:ih49+NdI8x0zmhJOdC55RJKaZ4xxFuNYhD6gJr5ZhPc=
+github.com/at-wat/s3iot/awss3v2 v0.0.4-0.20220522124335-89d02b4a6da6/go.mod h1:Fxd7VVR+YIZziCfQiT729+ps5NZ3U5BmyoMeJDDLWec=
 github.com/aws/aws-sdk-go-v2 v1.16.4 h1:swQTEQUyJF/UkEA94/Ga55miiKFoXmm/Zd67XHgmjSg=
 github.com/aws/aws-sdk-go-v2 v1.16.4/go.mod h1:ytwTPBG6fXTZLxxeeCCWj2/EMYp/xDUgX+OET6TLNNU=
 github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.4.1 h1:SdK4Ppk5IzLs64ZMvr6MrSficMtjY2oS0WOORXTlxwU=

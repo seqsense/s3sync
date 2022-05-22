@@ -385,7 +385,7 @@ func (m *Manager) listS3Files(ctx context.Context, path *s3Path) chan *fileInfo 
 
 // listS3FileWithToken lists (send to the result channel) the s3 files from the given continuation token.
 func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, path *s3Path, token *string) *string {
-	list, err := m.s3.ListObjects(ctx, &s3api.ListObjectsInput{
+	list, err := m.s3.ListObjectsV2(ctx, &s3api.ListObjectsV2Input{
 		Bucket:            &path.bucket,
 		Prefix:            &path.bucketPrefix,
 		ContinuationToken: token,
