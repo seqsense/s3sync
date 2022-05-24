@@ -479,6 +479,11 @@ func sendErrorInfoToChannel(c chan *fileInfo, err error) {
 func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) chan *fileOp {
 	c := make(chan *fileOp)
 
+	sourceFiles := []*fileInfo{}
+	for sourceFile := range sourceFileChan {
+		sourceFiles = append(sourceFiles, sourceFile)
+	}
+
 	destFiles, err := fileInfoChanToMap(destFileChan)
 
 	go func() {
@@ -487,7 +492,7 @@ func filterFilesForSync(sourceFileChan, destFileChan chan *fileInfo, del bool) c
 			c <- &fileOp{fileInfo: &fileInfo{err: err}}
 			return
 		}
-		for sourceInfo := range sourceFileChan {
+		for _, sourceInfo := range sourceFiles {
 			destInfo, ok := destFiles[sourceInfo.name]
 			// source is necessary to sync if
 			// 1. The dest doesn't exist
