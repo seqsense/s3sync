@@ -15,6 +15,7 @@ package s3sync
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -578,7 +579,7 @@ func TestListLocalFiles(t *testing.T) {
 	}
 
 	t.Run("Root", func(t *testing.T) {
-		paths := collectFilePaths(listLocalFiles(temp))
+		paths := collectFilePaths(listLocalFiles(context.Background(), temp))
 		expected := []string{
 			filepath.Join(temp, "bar", "baz", "test3"),
 			filepath.Join(temp, "foo", "test2"),
@@ -590,7 +591,7 @@ func TestListLocalFiles(t *testing.T) {
 	})
 
 	t.Run("EmptyDir", func(t *testing.T) {
-		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "empty")))
+		paths := collectFilePaths(listLocalFiles(context.Background(), filepath.Join(temp, "empty")))
 		expected := []string{}
 		if !reflect.DeepEqual(expected, paths) {
 			t.Errorf("Local file list is expected to be %v, got %v", expected, paths)
@@ -598,7 +599,7 @@ func TestListLocalFiles(t *testing.T) {
 	})
 
 	t.Run("File", func(t *testing.T) {
-		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "test1")))
+		paths := collectFilePaths(listLocalFiles(context.Background(), filepath.Join(temp, "test1")))
 		expected := []string{
 			filepath.Join(temp, "test1"),
 		}
@@ -608,7 +609,7 @@ func TestListLocalFiles(t *testing.T) {
 	})
 
 	t.Run("Dir", func(t *testing.T) {
-		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "foo")))
+		paths := collectFilePaths(listLocalFiles(context.Background(), filepath.Join(temp, "foo")))
 		expected := []string{
 			filepath.Join(temp, "foo", "test2"),
 		}
@@ -618,7 +619,7 @@ func TestListLocalFiles(t *testing.T) {
 	})
 
 	t.Run("Dir2", func(t *testing.T) {
-		paths := collectFilePaths(listLocalFiles(filepath.Join(temp, "bar")))
+		paths := collectFilePaths(listLocalFiles(context.Background(), filepath.Join(temp, "bar")))
 		expected := []string{
 			filepath.Join(temp, "bar", "baz", "test3"),
 		}
