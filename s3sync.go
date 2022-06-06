@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -41,6 +42,7 @@ type Manager struct {
 	contentType    *string
 	downloaderOpts []func(*s3manager.Downloader)
 	uploaderOpts   []func(*s3manager.Uploader)
+	statistics     syncStatistics
 }
 
 type operation int
@@ -63,6 +65,13 @@ type fileInfo struct {
 type fileOp struct {
 	*fileInfo
 	op operation
+}
+
+type syncStatistics struct {
+	Bytes              int64
+	Files              int64
+	Time               int64
+	DeletedRemoteFiles int64
 }
 
 // New returns a new Manager.
@@ -133,6 +142,11 @@ func (m *Manager) Sync(source, dest string) error {
 	}
 
 	return errors.New("local to local sync is not supported")
+}
+
+// GetStatistics returns the structure that contains the sync statistics
+func (m *Manager) GetStatistics() syncStatistics {
+	return m.statistics
 }
 
 func isS3URL(url *url.URL) bool {
@@ -240,17 +254,17 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
-	_, err = s3manager.NewDownloaderWithClient(
-		m.s3,
-		m.downloaderOpts...,
-	).Download(writer, &s3.GetObjectInput{
+	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
+	start := time.Now()
+	written, err := c.Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
 	})
 	if err != nil {
 		return err
 	}
-
+	finish := time.Now()
+	m.updateSyncStatistics(written, (finish.UnixMilli() - start.UnixMilli()), 1)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -272,8 +286,12 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	if m.dryrun {
 		return nil
 	}
-
-	return os.Remove(targetFilename)
+	err := os.Remove(targetFilename)
+	if err != nil {
+		return err
+	}
+	m.statistics.DeletedRemoteFiles = +1
+	return nil
 }
 
 func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
@@ -316,6 +334,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
+	start := time.Now()
 	_, err = s3manager.NewUploaderWithClient(
 		m.s3,
 		m.uploaderOpts...,
@@ -326,11 +345,11 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 		Body:        reader,
 		ContentType: contentType,
 	})
-
+	finish := time.Now()
 	if err != nil {
 		return err
 	}
-
+	m.updateSyncStatistics(file.size, finish.UnixMilli()-start.UnixMilli(), 1)
 	return nil
 }
 
@@ -351,7 +370,11 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 		Bucket: aws.String(destFile.bucket),
 		Key:    aws.String(destFile.bucketPrefix),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	atomic.AddInt64(&m.statistics.DeletedRemoteFiles, 1)
+	return nil
 }
 
 // listS3Files return a channel which receives the file infos under the given s3Path.
@@ -543,4 +566,12 @@ func fileInfoChanToMap(files chan *fileInfo) (map[string]*fileInfo, error) {
 		result[file.name] = file
 	}
 	return result, nil
+}
+
+// updateSyncStatistics updates the sync statistics of the number of bytes transferred, number of files and the
+// time it took to complete the sync.
+func (m *Manager) updateSyncStatistics(size, time int64, files int) {
+	atomic.AddInt64(&m.statistics.Files, int64(files))
+	atomic.AddInt64(&m.statistics.Bytes, size)
+	atomic.AddInt64(&m.statistics.Time, time)
 }

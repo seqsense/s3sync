@@ -261,7 +261,8 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete()).Sync(
+		m := New(getSession(), WithDelete())
+		if err := m.Sync(
 			"s3://example-bucket", temp,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -274,6 +275,20 @@ func TestDelete(t *testing.T) {
 		fileHasSize(t, filepath.Join(temp, dummyFilename), dummyFileSize)
 		fileHasSize(t, filepath.Join(temp, "foo", dummyFilename), dummyFileSize)
 		fileHasSize(t, filepath.Join(temp, "bar/baz", dummyFilename), dummyFileSize)
+
+		stats := m.GetStatistics()
+		if stats.Files != 3 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 3, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
+		}
+		if stats.DeletedRemoteFiles != 1 {
+			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedRemoteFiles)
+		}
+		if stats.Time == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		}
 	})
 	t.Run("DeleteLocalSingleFile", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
@@ -289,7 +304,8 @@ func TestDelete(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete()).Sync(
+		m := New(getSession(), WithDelete())
+		if err := m.Sync(
 			"s3://example-bucket/dest_only_file", destOnlyFilename,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -297,6 +313,10 @@ func TestDelete(t *testing.T) {
 
 		if _, err := os.Stat(destOnlyFilename); !os.IsNotExist(err) {
 			t.Error("Destination-only-file should be removed by sync")
+		}
+		stats := m.GetStatistics()
+		if !reflect.DeepEqual(syncStatistics{DeletedRemoteFiles: 1}, stats) {
+			t.Errorf("Expected %+v, but found %+v", syncStatistics{DeletedRemoteFiles: 1}, stats)
 		}
 	})
 	t.Run("DeleteRemote", func(t *testing.T) {
@@ -324,10 +344,8 @@ func TestDelete(t *testing.T) {
 				t.Fatal("Failed to write", err)
 			}
 		}
-
-		if err := New(
-			getSession(), WithDelete(),
-		).Sync(temp, "s3://example-bucket-delete"); err != nil {
+		m := New(getSession(), WithDelete())
+		if err := m.Sync(temp, "s3://example-bucket-delete"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -345,6 +363,19 @@ func TestDelete(t *testing.T) {
 			objs[2].path != "foo/README.md" {
 			t.Error("Unexpected keys", objs)
 		}
+		stats := m.GetStatistics()
+		if stats.Files != 3 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 3, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
+		}
+		if stats.DeletedRemoteFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		}
+		if stats.Time == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		}
 	})
 	t.Run("DeleteRemoteSingleFile", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
@@ -353,10 +384,8 @@ func TestDelete(t *testing.T) {
 		if err != nil {
 			t.Fatal("Failed to create temp dir")
 		}
-
-		if err := New(
-			getSession(), WithDelete(),
-		).Sync(filepath.Join(temp, "dest_only_file"), "s3://example-bucket-delete-file/dest_only_file"); err != nil {
+		m := New(getSession(), WithDelete())
+		if err := m.Sync(filepath.Join(temp, "dest_only_file"), "s3://example-bucket-delete-file/dest_only_file"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -370,6 +399,11 @@ func TestDelete(t *testing.T) {
 		if objs[0].path != "README.md" {
 			t.Error("Unexpected keys", objs)
 		}
+		stats := m.GetStatistics()
+		if !reflect.DeepEqual(stats, syncStatistics{}) {
+			t.Errorf("Expected stats %+v but found %+v", syncStatistics{}, stats)
+		}
+
 	})
 }
 
@@ -395,7 +429,8 @@ func TestDryRun(t *testing.T) {
 			t.Fatal("Failed to write", err)
 		}
 
-		if err := New(getSession(), WithDelete(), WithDryRun()).Sync(
+		m := New(getSession(), WithDelete(), WithDryRun())
+		if err := m.Sync(
 			"s3://example-bucket", temp,
 		); err != nil {
 			t.Fatal("Sync should be successful", err)
@@ -412,6 +447,11 @@ func TestDryRun(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(temp, "bar/baz", dummyFilename)); !os.IsNotExist(err) {
 			t.Error("File must not be downloaded on dry-run")
 		}
+		stats := m.GetStatistics()
+		if !reflect.DeepEqual(stats, syncStatistics{}) {
+			t.Error("Statistics must not change on a dry-run")
+		}
+
 	})
 	t.Run("Upload", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
@@ -439,9 +479,8 @@ func TestDryRun(t *testing.T) {
 			}
 		}
 
-		if err := New(
-			getSession(), WithDelete(), WithDryRun(),
-		).Sync(temp, "s3://example-bucket-dryrun"); err != nil {
+		m := New(getSession(), WithDelete(), WithDryRun())
+		if err := m.Sync(temp, "s3://example-bucket-dryrun"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -454,6 +493,10 @@ func TestDryRun(t *testing.T) {
 		}
 		if objs[0].path != "dest_only_file" {
 			t.Error("Unexpected key", objs[0].path)
+		}
+		stats := m.GetStatistics()
+		if !reflect.DeepEqual(stats, syncStatistics{}) {
+			t.Error("Statistics must not change on a dry-run")
 		}
 	})
 }
@@ -486,16 +529,30 @@ func TestPartialS3sync(t *testing.T) {
 
 	t.Run("DestinationEmpty", func(t *testing.T) {
 		atomic.StoreUint32(&syncCount, 0)
-
-		if err := New(getSession()).Sync("s3://example-bucket", temp); err != nil {
+		m := New(getSession())
+		if err := m.Sync("s3://example-bucket", temp); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
 		if atomic.LoadUint32(&syncCount) != 3 {
 			t.Fatal("3 files should be synced")
 		}
-
 		assertFileSize(t)
+
+		stats := m.GetStatistics()
+		if stats.Files != 3 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 3, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
+		}
+		if stats.DeletedRemoteFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		}
+		if stats.Time == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		}
+
 	})
 
 	t.Run("DestinationLackOneFile", func(t *testing.T) {
@@ -503,7 +560,8 @@ func TestPartialS3sync(t *testing.T) {
 
 		os.RemoveAll(filepath.Join(temp, "foo"))
 
-		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+		m := New(getSession())
+		if m.Sync("s3://example-bucket", temp) != nil {
 			t.Fatal("Sync should be successful")
 		}
 
@@ -512,6 +570,19 @@ func TestPartialS3sync(t *testing.T) {
 		}
 
 		assertFileSize(t)
+		stats := m.GetStatistics()
+		if stats.Files != 1 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 1, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
+		}
+		if stats.DeletedRemoteFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		}
+		if stats.Time == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		}
 	})
 
 	t.Run("DestinationOneOldFile", func(t *testing.T) {
@@ -521,7 +592,8 @@ func TestPartialS3sync(t *testing.T) {
 		filename := filepath.Join(temp, "README.md")
 		os.Chtimes(filename, oldTime, oldTime)
 
-		if New(getSession()).Sync("s3://example-bucket", temp) != nil {
+		m := New(getSession())
+		if m.Sync("s3://example-bucket", temp) != nil {
 			t.Fatal("Sync should be successful")
 		}
 
@@ -538,6 +610,19 @@ func TestPartialS3sync(t *testing.T) {
 		}
 
 		assertFileSize(t)
+		stats := m.GetStatistics()
+		if stats.Files != 1 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 1, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
+		}
+		if stats.DeletedRemoteFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		}
+		if stats.Time == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		}
 	})
 }
 
