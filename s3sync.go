@@ -264,7 +264,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		return err
 	}
 	finish := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
-	m.updateSyncStatistics(written, (finish - start), 1)
+	m.updateSyncFileStatistics(written, (finish - start))
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -349,7 +349,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	if err != nil {
 		return err
 	}
-	m.updateSyncStatistics(file.size, finish-start, 1)
+	m.updateSyncFileStatistics(file.size, finish-start)
 	return nil
 }
 
@@ -568,10 +568,10 @@ func fileInfoChanToMap(files chan *fileInfo) (map[string]*fileInfo, error) {
 	return result, nil
 }
 
-// updateSyncStatistics updates the sync statistics of the number of bytes transferred, number of files and the
-// time it took to complete the sync.
-func (m *Manager) updateSyncStatistics(size, time int64, files int) {
-	atomic.AddInt64(&m.statistics.Files, int64(files))
+// updateSyncFileStatistics updates the sync statistics of the number of bytes transferred and the
+// time it took to complete the sync of a given file.
+func (m *Manager) updateSyncFileStatistics(size, time int64) {
+	atomic.AddInt64(&m.statistics.Files, 1)
 	atomic.AddInt64(&m.statistics.Bytes, size)
 	atomic.AddInt64(&m.statistics.Time, time)
 }
