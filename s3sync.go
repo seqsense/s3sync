@@ -255,7 +255,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	}
 
 	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
-	start := time.Now()
+	start := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	written, err := c.Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
@@ -263,8 +263,8 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if err != nil {
 		return err
 	}
-	finish := time.Now()
-	m.updateSyncStatistics(written, (finish.UnixMilli() - start.UnixMilli()), 1)
+	finish := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
+	m.updateSyncStatistics(written, (finish - start), 1)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -334,7 +334,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
-	start := time.Now()
+	start := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	_, err = s3manager.NewUploaderWithClient(
 		m.s3,
 		m.uploaderOpts...,
@@ -345,11 +345,11 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 		Body:        reader,
 		ContentType: contentType,
 	})
-	finish := time.Now()
+	finish := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	if err != nil {
 		return err
 	}
-	m.updateSyncStatistics(file.size, finish.UnixMilli()-start.UnixMilli(), 1)
+	m.updateSyncStatistics(file.size, finish-start, 1)
 	return nil
 }
 
