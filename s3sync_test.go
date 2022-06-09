@@ -283,11 +283,11 @@ func TestDelete(t *testing.T) {
 		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
 			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
 		}
-		if stats.DeletedRemoteFiles != 1 {
-			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedRemoteFiles)
+		if stats.DeletedFiles != 1 {
+			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedFiles)
 		}
-		if stats.Time == 0 {
-			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 	})
 	t.Run("DeleteLocalSingleFile", func(t *testing.T) {
@@ -315,8 +315,17 @@ func TestDelete(t *testing.T) {
 			t.Error("Destination-only-file should be removed by sync")
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(syncStatistics{DeletedRemoteFiles: 1}, stats) {
-			t.Errorf("Expected %+v, but found %+v", syncStatistics{DeletedRemoteFiles: 1}, stats)
+		if stats.Files != 0 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 0, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
+		}
+		if stats.DeletedFiles != 1 {
+			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedFiles)
+		}
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 	})
 	t.Run("DeleteRemote", func(t *testing.T) {
@@ -370,11 +379,11 @@ func TestDelete(t *testing.T) {
 		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
 			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
 		}
-		if stats.DeletedRemoteFiles != 0 {
-			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		if stats.DeletedFiles != 1 {
+			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedFiles)
 		}
-		if stats.Time == 0 {
-			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 	})
 	t.Run("DeleteRemoteSingleFile", func(t *testing.T) {
@@ -400,8 +409,17 @@ func TestDelete(t *testing.T) {
 			t.Error("Unexpected keys", objs)
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(stats, syncStatistics{}) {
-			t.Errorf("Expected stats %+v but found %+v", syncStatistics{}, stats)
+		if stats.Files != 0 {
+			t.Errorf("Expected files uploaded: %d, but found %d", 0, stats.Files)
+		}
+		if stats.Bytes != int64(stats.Files)*int64(dummyFileSize) {
+			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(dummyFileSize), stats.Bytes)
+		}
+		if stats.DeletedFiles != 1 {
+			t.Errorf("Expected deleted files: %d, but found %d", 1, stats.DeletedFiles)
+		}
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 
 	})
@@ -448,7 +466,7 @@ func TestDryRun(t *testing.T) {
 			t.Error("File must not be downloaded on dry-run")
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(stats, syncStatistics{}) {
+		if !reflect.DeepEqual(stats, SyncStatistics{}) {
 			t.Error("Statistics must not change on a dry-run")
 		}
 
@@ -495,7 +513,7 @@ func TestDryRun(t *testing.T) {
 			t.Error("Unexpected key", objs[0].path)
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(stats, syncStatistics{}) {
+		if !reflect.DeepEqual(stats, SyncStatistics{}) {
 			t.Error("Statistics must not change on a dry-run")
 		}
 	})
@@ -546,11 +564,11 @@ func TestPartialS3sync(t *testing.T) {
 		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
 			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
 		}
-		if stats.DeletedRemoteFiles != 0 {
-			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		if stats.DeletedFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedFiles)
 		}
-		if stats.Time == 0 {
-			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 
 	})
@@ -577,11 +595,11 @@ func TestPartialS3sync(t *testing.T) {
 		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
 			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
 		}
-		if stats.DeletedRemoteFiles != 0 {
-			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		if stats.DeletedFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedFiles)
 		}
-		if stats.Time == 0 {
-			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 	})
 
@@ -617,11 +635,11 @@ func TestPartialS3sync(t *testing.T) {
 		if stats.Bytes != int64(stats.Files)*int64(expectedFileSize) {
 			t.Errorf("Expected bytes uploaded: %d, but found %d", int64(stats.Files)*int64(expectedFileSize), stats.Bytes)
 		}
-		if stats.DeletedRemoteFiles != 0 {
-			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedRemoteFiles)
+		if stats.DeletedFiles != 0 {
+			t.Errorf("Expected deleted files: %d, but found %d", 0, stats.DeletedFiles)
 		}
-		if stats.Time == 0 {
-			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.Time)
+		if stats.SyncTime == 0 {
+			t.Errorf("Expected upload time to be greater than %d, but found %d", 0, stats.SyncTime)
 		}
 	})
 }

@@ -42,7 +42,14 @@ type Manager struct {
 	contentType    *string
 	downloaderOpts []func(*s3manager.Downloader)
 	uploaderOpts   []func(*s3manager.Uploader)
-	statistics     syncStatistics
+	statistics     SyncStatistics
+}
+
+type SyncStatistics struct {
+	Bytes        int64
+	Files        int64
+	SyncTime     time.Duration
+	DeletedFiles int64
 }
 
 type operation int
@@ -67,13 +74,6 @@ type fileOp struct {
 	op operation
 }
 
-type syncStatistics struct {
-	Bytes              int64
-	Files              int64
-	Time               int64
-	DeletedRemoteFiles int64
-}
-
 // New returns a new Manager.
 func New(sess *session.Session, options ...Option) *Manager {
 	m := &Manager{
@@ -89,6 +89,7 @@ func New(sess *session.Session, options ...Option) *Manager {
 
 // Sync syncs the files between s3 and local disks.
 func (m *Manager) Sync(source, dest string) error {
+	var startTime time.Time
 	sourceURL, err := url.Parse(source)
 	if err != nil {
 		return err
@@ -114,6 +115,9 @@ func (m *Manager) Sync(source, dest string) error {
 		}()
 	}
 	defer func() {
+		if !m.dryrun {
+			m.statistics.SyncTime = time.Duration((time.Now().UnixNano() - startTime.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond)))
+		}
 		close(chJob)
 		wg.Wait()
 	}()
@@ -128,8 +132,10 @@ func (m *Manager) Sync(source, dest string) error {
 			if err != nil {
 				return err
 			}
+			startTime = time.Now()
 			return m.syncS3ToS3(ctx, chJob, sourceS3Path, destS3Path)
 		}
+		startTime = time.Now()
 		return m.syncS3ToLocal(ctx, chJob, sourceS3Path, dest)
 	}
 
@@ -138,6 +144,7 @@ func (m *Manager) Sync(source, dest string) error {
 		if err != nil {
 			return err
 		}
+		startTime = time.Now()
 		return m.syncLocalToS3(ctx, chJob, source, destS3Path)
 	}
 
@@ -145,7 +152,7 @@ func (m *Manager) Sync(source, dest string) error {
 }
 
 // GetStatistics returns the structure that contains the sync statistics
-func (m *Manager) GetStatistics() syncStatistics {
+func (m *Manager) GetStatistics() SyncStatistics {
 	return m.statistics
 }
 
@@ -255,7 +262,6 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	}
 
 	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
-	start := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	written, err := c.Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
@@ -263,8 +269,8 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if err != nil {
 		return err
 	}
-	finish := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
-	m.updateSyncFileStatistics(written, (finish - start))
+	atomic.AddInt64(&m.statistics.Files, 1)
+	atomic.AddInt64(&m.statistics.Bytes, written)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -290,7 +296,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	if err != nil {
 		return err
 	}
-	m.statistics.DeletedRemoteFiles = +1
+	atomic.AddInt64(&m.statistics.DeletedFiles, 1)
 	return nil
 }
 
@@ -334,7 +340,6 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
-	start := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	_, err = s3manager.NewUploaderWithClient(
 		m.s3,
 		m.uploaderOpts...,
@@ -345,11 +350,11 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 		Body:        reader,
 		ContentType: contentType,
 	})
-	finish := time.Now().UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 	if err != nil {
 		return err
 	}
-	m.updateSyncFileStatistics(file.size, finish-start)
+	atomic.AddInt64(&m.statistics.Files, 1)
+	atomic.AddInt64(&m.statistics.Bytes, file.size)
 	return nil
 }
 
@@ -373,7 +378,7 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.DeletedRemoteFiles, 1)
+	atomic.AddInt64(&m.statistics.DeletedFiles, 1)
 	return nil
 }
 
@@ -566,12 +571,4 @@ func fileInfoChanToMap(files chan *fileInfo) (map[string]*fileInfo, error) {
 		result[file.name] = file
 	}
 	return result, nil
-}
-
-// updateSyncFileStatistics updates the sync statistics of the number of bytes transferred and the
-// time it took to complete the sync of a given file.
-func (m *Manager) updateSyncFileStatistics(size, time int64) {
-	atomic.AddInt64(&m.statistics.Files, 1)
-	atomic.AddInt64(&m.statistics.Bytes, size)
-	atomic.AddInt64(&m.statistics.Time, time)
 }
