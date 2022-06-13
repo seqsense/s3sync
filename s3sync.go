@@ -46,10 +46,26 @@ type Manager struct {
 }
 
 type SyncStatistics struct {
-	Bytes        int64
-	Files        int64
-	SyncTime     time.Duration
-	DeletedFiles int64
+	bytes        int64
+	files        int64
+	syncTime     int64
+	deletedFiles int64
+}
+
+func (s *SyncStatistics) SyncTime() time.Duration {
+	return time.Duration(atomic.LoadInt64(&s.syncTime))
+}
+
+func (s *SyncStatistics) Bytes() int64 {
+	return atomic.LoadInt64(&s.bytes)
+}
+
+func (s *SyncStatistics) Files() int64 {
+	return atomic.LoadInt64(&s.files)
+}
+
+func (s *SyncStatistics) DeletedFiles() int64 {
+	return atomic.LoadInt64(&s.deletedFiles)
 }
 
 type operation int
@@ -116,7 +132,7 @@ func (m *Manager) Sync(source, dest string) error {
 	}
 	defer func() {
 		if !m.dryrun {
-			m.statistics.SyncTime = time.Duration((time.Now().UnixNano() - startTime.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond)))
+			atomic.StoreInt64(&m.statistics.syncTime, (time.Now().UnixNano()-startTime.UnixNano())/(int64(time.Millisecond)/int64(time.Nanosecond)))
 		}
 		close(chJob)
 		wg.Wait()
@@ -269,8 +285,8 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.Files, 1)
-	atomic.AddInt64(&m.statistics.Bytes, written)
+	atomic.AddInt64(&m.statistics.files, 1)
+	atomic.AddInt64(&m.statistics.bytes, written)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -296,7 +312,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.DeletedFiles, 1)
+	atomic.AddInt64(&m.statistics.deletedFiles, 1)
 	return nil
 }
 
@@ -353,8 +369,8 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.Files, 1)
-	atomic.AddInt64(&m.statistics.Bytes, file.size)
+	atomic.AddInt64(&m.statistics.files, 1)
+	atomic.AddInt64(&m.statistics.bytes, file.size)
 	return nil
 }
 
@@ -378,7 +394,7 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.DeletedFiles, 1)
+	atomic.AddInt64(&m.statistics.deletedFiles, 1)
 	return nil
 }
 

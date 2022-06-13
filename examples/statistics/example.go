@@ -39,5 +39,5 @@ func main() {
 		panic(err)
 	}
 	s := manager.GetStatistics()
-	fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d\nFiles deleted: %d\n", s.Bytes, s.SyncTime, s.Files, s.DeletedFiles)
+	fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d\nFiles deleted: %d\n", s.Bytes(), s.SyncTime(), s.Files(), s.DeletedFiles())
 }
