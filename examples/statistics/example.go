@@ -15,6 +15,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -33,11 +34,13 @@ func main() {
 	fmt.Printf("from=%s\n", os.Args[1])
 	fmt.Printf("to=%s\n", os.Args[2])
 
+	startSync := time.Now()
 	manager := s3sync.New(sess)
 	err = manager.Sync(os.Args[1], os.Args[2])
+	syncTime := (time.Now().UnixNano() - startSync.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond))
 	if err != nil {
 		panic(err)
 	}
 	s := manager.GetStatistics()
-	fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d\nFiles deleted: %d\n", s.Bytes(), s.SyncTime(), s.Files(), s.DeletedFiles())
+	fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d millisecond(s)\nFiles deleted: %d\n", s.Bytes, s.Files, syncTime, s.DeletedFiles)
 }

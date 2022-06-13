@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -46,26 +45,10 @@ type Manager struct {
 }
 
 type SyncStatistics struct {
-	bytes        int64
-	files        int64
-	syncTime     int64
-	deletedFiles int64
-}
-
-func (s *SyncStatistics) SyncTime() time.Duration {
-	return time.Duration(atomic.LoadInt64(&s.syncTime))
-}
-
-func (s *SyncStatistics) Bytes() int64 {
-	return atomic.LoadInt64(&s.bytes)
-}
-
-func (s *SyncStatistics) Files() int64 {
-	return atomic.LoadInt64(&s.files)
-}
-
-func (s *SyncStatistics) DeletedFiles() int64 {
-	return atomic.LoadInt64(&s.deletedFiles)
+	Bytes        int64
+	Files        int64
+	DeletedFiles int64
+	mutex        sync.RWMutex
 }
 
 type operation int
@@ -105,7 +88,6 @@ func New(sess *session.Session, options ...Option) *Manager {
 
 // Sync syncs the files between s3 and local disks.
 func (m *Manager) Sync(source, dest string) error {
-	var startTime time.Time
 	sourceURL, err := url.Parse(source)
 	if err != nil {
 		return err
@@ -131,9 +113,6 @@ func (m *Manager) Sync(source, dest string) error {
 		}()
 	}
 	defer func() {
-		if !m.dryrun {
-			atomic.StoreInt64(&m.statistics.syncTime, (time.Now().UnixNano()-startTime.UnixNano())/(int64(time.Millisecond)/int64(time.Nanosecond)))
-		}
 		close(chJob)
 		wg.Wait()
 	}()
@@ -148,10 +127,8 @@ func (m *Manager) Sync(source, dest string) error {
 			if err != nil {
 				return err
 			}
-			startTime = time.Now()
 			return m.syncS3ToS3(ctx, chJob, sourceS3Path, destS3Path)
 		}
-		startTime = time.Now()
 		return m.syncS3ToLocal(ctx, chJob, sourceS3Path, dest)
 	}
 
@@ -160,7 +137,6 @@ func (m *Manager) Sync(source, dest string) error {
 		if err != nil {
 			return err
 		}
-		startTime = time.Now()
 		return m.syncLocalToS3(ctx, chJob, source, destS3Path)
 	}
 
@@ -169,7 +145,9 @@ func (m *Manager) Sync(source, dest string) error {
 
 // GetStatistics returns the structure that contains the sync statistics
 func (m *Manager) GetStatistics() SyncStatistics {
-	return m.statistics
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	return SyncStatistics{Bytes: m.statistics.Bytes, Files: m.statistics.Files, DeletedFiles: m.statistics.DeletedFiles}
 }
 
 func isS3URL(url *url.URL) bool {
@@ -285,8 +263,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.files, 1)
-	atomic.AddInt64(&m.statistics.bytes, written)
+	m.updateFileTransferStatistics(written)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -312,7 +289,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.deletedFiles, 1)
+	m.incrementDeletedFiles()
 	return nil
 }
 
@@ -369,8 +346,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.files, 1)
-	atomic.AddInt64(&m.statistics.bytes, file.size)
+	m.updateFileTransferStatistics(file.size)
 	return nil
 }
 
@@ -394,7 +370,7 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	if err != nil {
 		return err
 	}
-	atomic.AddInt64(&m.statistics.deletedFiles, 1)
+	m.incrementDeletedFiles()
 	return nil
 }
 
@@ -463,6 +439,21 @@ func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, pat
 	}
 
 	return list.NextContinuationToken
+}
+
+// updateSyncStatistics updates the statistics of the amount of bytes transferred for one file
+func (m *Manager) updateFileTransferStatistics(written int64) {
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	m.statistics.Files = m.statistics.Files + 1
+	m.statistics.Bytes = m.statistics.Bytes + written
+}
+
+// incrementDeletedFiles increments the counter used to capture the number of remote files deleted during the synchronization process
+func (m *Manager) incrementDeletedFiles() {
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	m.statistics.DeletedFiles = m.statistics.DeletedFiles + 1
 }
 
 // listLocalFiles returns a channel which receives the infos of the files under the given basePath.
