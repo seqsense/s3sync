@@ -41,6 +41,15 @@ type Manager struct {
 	contentType    *string
 	downloaderOpts []func(*s3manager.Downloader)
 	uploaderOpts   []func(*s3manager.Uploader)
+	statistics     SyncStatistics
+}
+
+// SyncStatistics captures the sync statistics.
+type SyncStatistics struct {
+	Bytes        int64
+	Files        int64
+	DeletedFiles int64
+	mutex        sync.RWMutex
 }
 
 type operation int
@@ -133,6 +142,13 @@ func (m *Manager) Sync(source, dest string) error {
 	}
 
 	return errors.New("local to local sync is not supported")
+}
+
+// GetStatistics returns the structure that contains the sync statistics
+func (m *Manager) GetStatistics() SyncStatistics {
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	return SyncStatistics{Bytes: m.statistics.Bytes, Files: m.statistics.Files, DeletedFiles: m.statistics.DeletedFiles}
 }
 
 func isS3URL(url *url.URL) bool {
@@ -240,17 +256,15 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
-	_, err = s3manager.NewDownloaderWithClient(
-		m.s3,
-		m.downloaderOpts...,
-	).Download(writer, &s3.GetObjectInput{
+	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
+	written, err := c.Download(writer, &s3.GetObjectInput{
 		Bucket: aws.String(sourcePath.bucket),
 		Key:    aws.String(sourceFile),
 	})
 	if err != nil {
 		return err
 	}
-
+	m.updateFileTransferStatistics(written)
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -272,8 +286,12 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	if m.dryrun {
 		return nil
 	}
-
-	return os.Remove(targetFilename)
+	err := os.Remove(targetFilename)
+	if err != nil {
+		return err
+	}
+	m.incrementDeletedFiles()
+	return nil
 }
 
 func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
@@ -326,11 +344,10 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 		Body:        reader,
 		ContentType: contentType,
 	})
-
 	if err != nil {
 		return err
 	}
-
+	m.updateFileTransferStatistics(file.size)
 	return nil
 }
 
@@ -351,7 +368,11 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 		Bucket: aws.String(destFile.bucket),
 		Key:    aws.String(destFile.bucketPrefix),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	m.incrementDeletedFiles()
+	return nil
 }
 
 // listS3Files return a channel which receives the file infos under the given s3Path.
@@ -419,6 +440,21 @@ func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, pat
 	}
 
 	return list.NextContinuationToken
+}
+
+// updateSyncStatistics updates the statistics of the amount of bytes transferred for one file
+func (m *Manager) updateFileTransferStatistics(written int64) {
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	m.statistics.Files++
+	m.statistics.Bytes += written
+}
+
+// incrementDeletedFiles increments the counter used to capture the number of remote files deleted during the synchronization process
+func (m *Manager) incrementDeletedFiles() {
+	m.statistics.mutex.Lock()
+	defer m.statistics.mutex.Unlock()
+	m.statistics.DeletedFiles++
 }
 
 // listLocalFiles returns a channel which receives the infos of the files under the given basePath.
