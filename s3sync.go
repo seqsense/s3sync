@@ -44,6 +44,7 @@ type Manager struct {
 	statistics     SyncStatistics
 }
 
+// SyncStatistics captures the sync statistics.
 type SyncStatistics struct {
 	Bytes        int64
 	Files        int64
@@ -445,15 +446,15 @@ func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, pat
 func (m *Manager) updateFileTransferStatistics(written int64) {
 	m.statistics.mutex.Lock()
 	defer m.statistics.mutex.Unlock()
-	m.statistics.Files = m.statistics.Files + 1
-	m.statistics.Bytes = m.statistics.Bytes + written
+	m.statistics.Files++
+	m.statistics.Bytes += written
 }
 
 // incrementDeletedFiles increments the counter used to capture the number of remote files deleted during the synchronization process
 func (m *Manager) incrementDeletedFiles() {
 	m.statistics.mutex.Lock()
 	defer m.statistics.mutex.Unlock()
-	m.statistics.DeletedFiles = m.statistics.DeletedFiles + 1
+	m.statistics.DeletedFiles++
 }
 
 // listLocalFiles returns a channel which receives the infos of the files under the given basePath.
