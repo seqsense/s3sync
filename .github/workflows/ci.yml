@@ -18,9 +18,12 @@ jobs:
         go_version:
           - 1.15
           - 1.16
+          - 1.17
+          - 1.18
+          - 1.19
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v3
         with:
           go-version: ${{ matrix.go_version }}
       - name: Test
@@ -34,6 +37,6 @@ jobs:
           make cover # run test with coverage
         env:
           AWS_REGION: ap-north-east-1 # for awscli
-      - uses: codecov/codecov-action@v2
+      - uses: codecov/codecov-action@v3
         with:
           file: ./cover.out
