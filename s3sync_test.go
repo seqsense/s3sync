@@ -34,9 +34,15 @@ func TestS3syncNotImplemented(t *testing.T) {
 	if err := m.Sync("foo", "bar"); err == nil {
 		t.Fatal("local to local sync is not supported")
 	}
+}
 
-	if err := m.Sync("s3://foo", "s3://bar"); err == nil {
-		t.Fatal("s3 to s3 sync is not implemented yet")
+func TestS3ToS3(t *testing.T) {
+	m := New(getSession())
+
+	err := m.Sync("s3://foo", "s3://bar")
+
+	if err != nil {
+		t.Fatal(err.Error())
 	}
 }
 
