@@ -254,7 +254,7 @@ func (m *Manager) copy(ctx context.Context, file *fileInfo, sourcePath *s3Path, 
 
 	_, err := m.s3.CopyObject(&s3.CopyObjectInput{
 		Bucket:     aws.String(destPath.bucket),
-		CopySource: aws.String(sourcePath.String() + "/" + file.name),
+		CopySource: aws.String(sourcePath.bucket + "/" + file.name),
 		Key:        aws.String(file.name),
 		ACL:        m.acl,
 	})

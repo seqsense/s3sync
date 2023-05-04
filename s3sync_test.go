@@ -39,7 +39,7 @@ func TestS3syncNotImplemented(t *testing.T) {
 func TestS3ToS3(t *testing.T) {
 	m := New(getSession())
 
-	err := m.Sync("s3://example-bucket", "s3://example-bucket-upload")
+	err := m.Sync("s3://s3-source", "s3://s3-destination")
 
 	if err != nil {
 		t.Fatal(err.Error())
