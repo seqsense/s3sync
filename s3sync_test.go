@@ -38,6 +38,14 @@ func TestS3syncNotImplemented(t *testing.T) {
 	if err := m.Sync("s3://foo", "s3://bar"); err == nil {
 		t.Fatal("s3 to s3 sync is not implemented yet")
 	}
+
+	if _, err := m.HasDifference("s3://foo", "s3://bar"); err == nil {
+		t.Fatal("s3 to s3 file differences check is not implemented yet")
+	}
+
+	if _, err := m.HasDifference("foo", "bar"); err == nil {
+		t.Fatal("local to local file differences check is not supported")
+	}
 }
 
 func TestS3sync(t *testing.T) {
@@ -235,6 +243,129 @@ func TestS3sync(t *testing.T) {
 			objs[2].path != "foo/bar/test2.md" ||
 			objs[3].path != "foo/test.md" {
 			t.Error("Unexpected keys", objs)
+		}
+	})
+}
+
+func TestHasDifference(t *testing.T) {
+	data, err := ioutil.ReadFile(dummyFilename)
+	if err != nil {
+		t.Fatal("Failed to read", dummyFilename)
+	}
+	dummyFileSize := len(data)
+
+	t.Run("Empty Dir", func(t *testing.T) {
+		s3URL := "s3://example-bucket-check-file-difference/empty"
+
+		localTempDir, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(localTempDir)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(localTempDir, s3URL)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+
+		hasDiff, err = New(getSession()).HasDifference(s3URL, localTempDir)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+	})
+
+	t.Run("Equal Files", func(t *testing.T) {
+		s3URL := "s3://example-bucket-check-file-difference/equal"
+
+		localTempDir, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(localTempDir)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		// Set the file structure to the same state as the comparison target.
+		if err := os.MkdirAll(filepath.Join(localTempDir, "foo", "bar"), 0755); err != nil {
+			t.Fatal("Failed to mkdir", err)
+		}
+		for _, file := range []string{
+			filepath.Join(localTempDir, dummyFilename),
+			filepath.Join(localTempDir, "foo", dummyFilename),
+			filepath.Join(localTempDir, "foo", "bar", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(s3URL, localTempDir)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+
+		// If the update time is newer than the comparison target file,
+		// the last update time is changed to earlier than the comparison target file because the file is to be updated.
+		oldTime := time.Date(1980, time.January, 1, 0, 0, 0, 0, time.UTC)
+		for _, file := range []string{
+			filepath.Join(localTempDir, dummyFilename),
+			filepath.Join(localTempDir, "foo", dummyFilename),
+			filepath.Join(localTempDir, "foo", "bar", dummyFilename),
+		} {
+			if err := os.Chtimes(file, oldTime, oldTime); err != nil {
+				t.Fatal("Failed to changes the access and modification times", err)
+			}
+		}
+
+		hasDiff, err = New(getSession()).HasDifference(localTempDir, s3URL)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if hasDiff {
+			t.Fatal("There should be no difference in the files")
+		}
+	})
+
+	t.Run("Different Files", func(t *testing.T) {
+		s3URL := "s3://example-bucket-check-file-difference/difference"
+
+		localTempDir, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(localTempDir)
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		if err := os.MkdirAll(filepath.Join(localTempDir, "foo", "bar"), 0755); err != nil {
+			t.Fatal("Failed to mkdir", err)
+		}
+		for _, file := range []string{
+			filepath.Join(localTempDir, dummyFilename),
+			filepath.Join(localTempDir, "foo", dummyFilename),
+			filepath.Join(localTempDir, "foo", "bar", dummyFilename),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		hasDiff, err := New(getSession()).HasDifference(localTempDir, s3URL)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if !hasDiff {
+			t.Fatal("There should be difference in the files")
+		}
+
+		hasDiff, err = New(getSession()).HasDifference(s3URL, localTempDir)
+		if err != nil {
+			t.Fatal("HasDifference should be successful", err)
+		} else if !hasDiff {
+			t.Fatal("There should be difference in the files")
 		}
 	})
 }
@@ -767,6 +898,192 @@ func TestS3sync_GuessMime(t *testing.T) {
 			}
 			if objs[0].contentType != tt.expected {
 				t.Errorf("Object ContentType should be %s, actual %s", tt.expected, objs[0].contentType)
+			}
+		})
+	}
+}
+
+func TestHasDifferenceFile(t *testing.T) {
+	nowTime := time.Now()
+
+	testCases := map[string]struct {
+		files    *checkFiles
+		wantErr  bool
+		expected bool
+	}{
+		"Equal File": {
+			files: &checkFiles{
+				sourceFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+				destFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+			},
+			expected: false,
+		},
+		"Not Equal File Size": {
+			files: &checkFiles{
+				sourceFile: &fileInfo{
+					size:         20,
+					lastModified: nowTime,
+				},
+				destFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+			},
+			expected: true,
+		},
+		"Old Last Modified Dest File": {
+			files: &checkFiles{
+				sourceFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime.Add(1 * time.Hour),
+				},
+				destFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+			},
+			expected: true,
+		},
+		"Old Last Modified Source File": {
+			files: &checkFiles{
+				sourceFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+				destFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime.Add(1 * time.Hour),
+				},
+			},
+			expected: false,
+		},
+		"No comparison source file information": {
+			files: &checkFiles{
+				sourceFile: nil,
+				destFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+			},
+			expected: false,
+			wantErr:  true,
+		},
+		"No comparison dest file information": {
+			files: &checkFiles{
+				sourceFile: &fileInfo{
+					size:         10,
+					lastModified: nowTime,
+				},
+				destFile: nil,
+			},
+			expected: true,
+		},
+		"No comparison file information": {
+			files: &checkFiles{
+				sourceFile: nil,
+				destFile:   nil,
+			},
+			expected: false,
+			wantErr:  true,
+		},
+	}
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got, err := hasDifferenceFile(tt.files)
+			if err != nil && !tt.wantErr {
+				t.Fatal("hasDifferenceFile should be successful", err)
+			}
+			if got != tt.expected {
+				t.Fatalf("expected to be %t, actual %t", tt.expected, !tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsSyncTargetFile(t *testing.T) {
+	nowTime := time.Now()
+
+	testCases := map[string]struct {
+		sourceFile *fileInfo
+		destFile   *fileInfo
+		expected   bool
+	}{
+		"Equal File": {
+			sourceFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			destFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			expected: false,
+		},
+		"Not Equal File Size": {
+			sourceFile: &fileInfo{
+				size:         20,
+				lastModified: nowTime,
+			},
+			destFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			expected: true,
+		},
+		"Old Last Modified Dest File": {
+			sourceFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime.Add(1 * time.Hour),
+			},
+			destFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			expected: true,
+		},
+		"Old Last Modified Source File": {
+			sourceFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			destFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime.Add(1 * time.Hour),
+			},
+			expected: false,
+		},
+		"No comparison source file information": {
+			sourceFile: nil,
+			destFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			expected: false,
+		},
+		"No comparison dest file information": {
+			sourceFile: &fileInfo{
+				size:         10,
+				lastModified: nowTime,
+			},
+			destFile: nil,
+			expected: false,
+		},
+		"No comparison file information": {
+			sourceFile: nil,
+			destFile:   nil,
+			expected:   false,
+		},
+	}
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if tt.expected != isSyncTargetFile(tt.sourceFile, tt.destFile) {
+				t.Fatalf("expected to be %t, actual %t", tt.expected, !tt.expected)
 			}
 		})
 	}

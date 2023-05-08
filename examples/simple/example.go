@@ -33,8 +33,19 @@ func main() {
 	fmt.Printf("from=%s\n", os.Args[1])
 	fmt.Printf("to=%s\n", os.Args[2])
 
-	err = s3sync.New(sess).Sync(os.Args[1], os.Args[2])
+	syncManager := s3sync.New(sess)
+
+	hasDiff, err := syncManager.HasDifference(os.Args[1], os.Args[2])
 	if err != nil {
 		panic(err)
+	}
+
+	if hasDiff {
+		err = syncManager.Sync(os.Args[1], os.Args[2])
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		fmt.Println("There are no differences in the files.")
 	}
 }
