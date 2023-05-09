@@ -140,6 +140,27 @@ func TestS3sync(t *testing.T) {
 		fileHasSize(t, filepath.Join(temp, "test.md"), dummyFileSize)
 	})
 
+	t.Run("S3ToS3Copy", func(t *testing.T) {
+		if err := New(getSession()).Sync("s3://s3-source", "s3://s3-destination"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		objs := listObjectsSorted(t, "s3-destination")
+		if n := len(objs); n != 3 {
+			t.Fatalf("Number of the files should be 3 (result: %v)", objs)
+		}
+		for _, obj := range objs {
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
+			}
+		}
+		if objs[0].path != "README.md" ||
+			objs[1].path != "bar/baz/README.md" ||
+			objs[2].path != "foo/README.md" {
+			t.Error("Unexpected keys", objs)
+		}
+	})
+
 	t.Run("Upload", func(t *testing.T) {
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
