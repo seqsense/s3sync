@@ -171,7 +171,7 @@ func (m *Manager) syncS3ToS3(ctx context.Context, chJob chan func(), sourcePath 
 			}
 			switch source.op {
 			case opUpdate:
-				if err := m.copy(ctx, source.fileInfo, sourcePath, destPath); err != nil {
+				if err := m.copyS3ToS3(ctx, source.fileInfo, sourcePath, destPath); err != nil {
 					errs.Append(err)
 				}
 			}
@@ -246,7 +246,7 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 	return errs.ErrOrNil()
 }
 
-func (m *Manager) copy(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
+func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
 	println("Copying", file.name, "to", destPath.String())
 	if m.dryrun {
 		return nil
