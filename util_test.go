@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,9 +24,11 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 )
 
+const awsRegion = "ap-northeast-1"
+
 func getSession() *session.Session {
 	sess, _ := session.NewSession(&aws.Config{
-		Region:           aws.String("ap-northeast-1"),
+		Region:           aws.String(awsRegion),
 		S3ForcePathStyle: aws.Bool(true),
 		Endpoint:         aws.String("http://localhost:4572"),
 	})
@@ -53,7 +55,7 @@ func (l s3ObjectList) Swap(i, j int) {
 
 func deleteObject(t *testing.T, bucket, key string) {
 	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String("test"),
+		Region:           aws.String(awsRegion),
 		Endpoint:         aws.String("http://localhost:4572"),
 		S3ForcePathStyle: aws.Bool(true),
 	}))
@@ -69,7 +71,7 @@ func deleteObject(t *testing.T, bucket, key string) {
 
 func listObjectsSorted(t *testing.T, bucket string) []s3Object {
 	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String("test"),
+		Region:           aws.String(awsRegion),
 		Endpoint:         aws.String("http://localhost:4572"),
 		S3ForcePathStyle: aws.Bool(true),
 	}))
