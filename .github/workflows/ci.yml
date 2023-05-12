@@ -26,6 +26,8 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: ${{ matrix.go_version }}
+      - name: Go vet
+        run: go vet ./...
       - name: Test
         run: |
           # Start mock s3 service
