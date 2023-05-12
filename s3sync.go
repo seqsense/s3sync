@@ -155,8 +155,32 @@ func isS3URL(url *url.URL) bool {
 	return url.Scheme == "s3"
 }
 
-func (m *Manager) syncS3ToS3(ctx context.Context, chJob chan func(), sourcePath, destPath *s3Path) error {
-	return errors.New("S3 to S3 sync feature is not implemented")
+func (m *Manager) syncS3ToS3(ctx context.Context, chJob chan func(), sourcePath *s3Path, destPath *s3Path) error {
+	wg := &sync.WaitGroup{}
+	errs := &multiErr{}
+	for source := range filterFilesForSync(
+		m.listS3Files(ctx, sourcePath), m.listS3Files(ctx, destPath), m.del,
+	) {
+		wg.Add(1)
+		source := source
+		chJob <- func() {
+			defer wg.Done()
+			if source.err != nil {
+				errs.Append(source.err)
+				return
+			}
+			switch source.op {
+			case opUpdate:
+				if err := m.copyS3ToS3(ctx, source.fileInfo, sourcePath, destPath); err != nil {
+					errs.Append(err)
+				}
+			}
+		}
+	}
+	wg.Wait()
+
+	return errs.ErrOrNil()
+
 }
 
 func (m *Manager) syncLocalToS3(ctx context.Context, chJob chan func(), sourcePath string, destPath *s3Path) error {
@@ -220,6 +244,27 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 	wg.Wait()
 
 	return errs.ErrOrNil()
+}
+
+func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
+	println("Copying", file.name, "to", destPath.String())
+	if m.dryrun {
+		return nil
+	}
+
+	_, err := m.s3.CopyObject(&s3.CopyObjectInput{
+		Bucket:     aws.String(destPath.bucket),
+		CopySource: aws.String(sourcePath.bucket + "/" + file.name),
+		Key:        aws.String(file.name),
+		ACL:        m.acl,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	m.updateFileTransferStatistics(file.size)
+	return nil
 }
 
 func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
