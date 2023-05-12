@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -481,7 +481,7 @@ func TestDryRun(t *testing.T) {
 			t.Error("File must not be downloaded on dry-run")
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(stats, SyncStatistics{}) {
+		if !reflect.DeepEqual(&stats, &SyncStatistics{}) {
 			t.Error("Statistics must not change on a dry-run")
 		}
 
@@ -528,7 +528,7 @@ func TestDryRun(t *testing.T) {
 			t.Error("Unexpected key", objs[0].path)
 		}
 		stats := m.GetStatistics()
-		if !reflect.DeepEqual(stats, SyncStatistics{}) {
+		if !reflect.DeepEqual(&stats, &SyncStatistics{}) {
 			t.Error("Statistics must not change on a dry-run")
 		}
 	})
