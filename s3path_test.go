@@ -14,6 +14,7 @@
 package s3sync
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 )
@@ -37,6 +38,24 @@ func TestURLToS3Path(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		if p.bucket != "bucket" || p.bucketPrefix != "test" {
+			t.Fatalf("Unexpected s3Path: %v", p)
+		}
+	})
+	t.Run("UrlEscapedPath", func(t *testing.T) {
+		urlHost := "bucket"
+		urlPath := url.QueryEscape("test/it")
+		srUrl, err := url.Parse(fmt.Sprintf("s3://%s/%s", urlHost, urlPath))
+
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		p, err := urlToS3Path(srUrl)
+
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if p.bucket != urlHost || p.bucketPrefix != urlPath {
 			t.Fatalf("Unexpected s3Path: %v", p)
 		}
 	})

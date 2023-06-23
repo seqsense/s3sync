@@ -17,6 +17,7 @@ import (
 	"compress/gzip"
 	"context"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -205,6 +206,72 @@ func TestS3sync(t *testing.T) {
 			objs[2].path != "dest_only_file" ||
 			objs[3].path != "foo/README.md" {
 			t.Error("Unexpected keys", objs)
+		}
+	})
+
+	t.Run("UploadEscaped", func(t *testing.T) {
+		// https://github.com/localstack/localstack/issues/8174
+		t.Skip("Skip till localstack would support url escaped characters for key names")
+		temp, err := ioutil.TempDir("", "s3synctest")
+		defer os.RemoveAll(temp)
+
+		escapedFileName := url.QueryEscape("READ%2FME.md")
+
+		if err != nil {
+			t.Fatal("Failed to create temp dir")
+		}
+
+		for _, dir := range []string{
+			filepath.Join(temp, "foo%2Fescape"),
+			filepath.Join(temp, "bar", "baz%2Fescape"),
+			filepath.Join(temp, "pre%2Ffix/foo%2Fescape"),
+			filepath.Join(temp, "pre%2Ffix/bar", "baz%2Fescape"),
+		} {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				t.Fatal("Failed to mkdir", err)
+			}
+		}
+
+		for _, file := range []string{
+			filepath.Join(temp, escapedFileName),
+			filepath.Join(temp, "foo%2Fescape", escapedFileName),
+			filepath.Join(temp, "bar", "baz%2Fescape", escapedFileName),
+		} {
+			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+				t.Fatal("Failed to write", err)
+			}
+		}
+
+		if err := New(getSession()).Sync(temp, "s3://example-bucket-escaped"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		if err := New(getSession()).Sync(temp, "s3://example-bucket-escaped/pre%2Ffix"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		objs := listObjectsSorted(t, "example-bucket-escaped")
+		if n := len(objs); n != 6 {
+			t.Fatalf("Number of the files should be 6 (result: %v)", objs)
+		}
+
+		objPaths := []string{}
+		for _, obj := range objs {
+			objPaths = append(objPaths, obj.path)
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
+			}
+		}
+
+		if !reflect.DeepEqual(objPaths, []string{
+			"READ%2FME.md",
+			"bar/baz%2Fescape/READ%2FME.md",
+			"foo%2Fescape/READ%2FME.md",
+			"pre%2Ffix/READ%2FME.md",
+			"pre%2Ffix/bar/baz%2Fescape/READ%2FME.md",
+			"pre%2Ffix/foo%2Fescape/READ%2FME.md",
+		}) {
+			t.Error("Unexpected keys", objPaths)
 		}
 	})
 	t.Run("UploadSingleFile", func(t *testing.T) {
