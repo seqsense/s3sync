@@ -16,6 +16,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -210,22 +211,20 @@ func TestS3sync(t *testing.T) {
 	})
 
 	t.Run("UploadEscaped", func(t *testing.T) {
-		// https://github.com/localstack/localstack/issues/8174
-		t.Skip("Skip till localstack would support url escaped characters for key names")
 		temp, err := ioutil.TempDir("", "s3synctest")
 		defer os.RemoveAll(temp)
 
-		escapedFileName := url.QueryEscape("READ%2FME.md")
+		escapedFileName := fmt.Sprintf("SPACE %s", url.QueryEscape("READ%2FME.md"))
 
 		if err != nil {
 			t.Fatal("Failed to create temp dir")
 		}
 
 		for _, dir := range []string{
-			filepath.Join(temp, "foo%2Fescape"),
-			filepath.Join(temp, "bar", "baz%2Fescape"),
-			filepath.Join(temp, "pre%2Ffix/foo%2Fescape"),
-			filepath.Join(temp, "pre%2Ffix/bar", "baz%2Fescape"),
+			filepath.Join(temp, "foo%2Fescape space"),
+			filepath.Join(temp, "bar", "baz%2Fescape space"),
+			filepath.Join(temp, "pre%2Ffix space/foo%2Fescape space"),
+			filepath.Join(temp, "pre%2Ffix space/bar", "baz%2Fescape space"),
 		} {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				t.Fatal("Failed to mkdir", err)
@@ -234,8 +233,8 @@ func TestS3sync(t *testing.T) {
 
 		for _, file := range []string{
 			filepath.Join(temp, escapedFileName),
-			filepath.Join(temp, "foo%2Fescape", escapedFileName),
-			filepath.Join(temp, "bar", "baz%2Fescape", escapedFileName),
+			filepath.Join(temp, "foo%2Fescape space", escapedFileName),
+			filepath.Join(temp, "bar", "baz%2Fescape space", escapedFileName),
 		} {
 			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
@@ -246,7 +245,7 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		if err := New(getSession()).Sync(temp, "s3://example-bucket-escaped/pre%2Ffix"); err != nil {
+		if err := New(getSession()).Sync(temp, "s3://example-bucket-escaped/pre%2Ffix space"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
@@ -263,15 +262,16 @@ func TestS3sync(t *testing.T) {
 			}
 		}
 
-		if !reflect.DeepEqual(objPaths, []string{
-			"READ%2FME.md",
-			"bar/baz%2Fescape/READ%2FME.md",
-			"foo%2Fescape/READ%2FME.md",
-			"pre%2Ffix/READ%2FME.md",
-			"pre%2Ffix/bar/baz%2Fescape/READ%2FME.md",
-			"pre%2Ffix/foo%2Fescape/READ%2FME.md",
-		}) {
-			t.Error("Unexpected keys", objPaths)
+		expectedKeys := []string{
+			"SPACE READ%252FME.md",
+			"bar/baz%2Fescape space/SPACE READ%252FME.md",
+			"foo%2Fescape space/SPACE READ%252FME.md",
+			"pre%2Ffix space/SPACE READ%252FME.md",
+			"pre%2Ffix space/bar/baz%2Fescape space/SPACE READ%252FME.md",
+			"pre%2Ffix space/foo%2Fescape space/SPACE READ%252FME.md",
+		}
+		if !reflect.DeepEqual(objPaths, expectedKeys) {
+			t.Errorf("Keys don't match\nexpected %v\nactual %v", objPaths, expectedKeys)
 		}
 	})
 	t.Run("UploadSingleFile", func(t *testing.T) {
