@@ -43,7 +43,7 @@ func TestURLToS3Path(t *testing.T) {
 	})
 	t.Run("UrlEscapedPath", func(t *testing.T) {
 		urlHost := "bucket"
-		urlPath := url.QueryEscape("test/it")
+		urlPath := fmt.Sprintf("space /%s", url.QueryEscape("test/it"))
 		srUrl, err := url.Parse(fmt.Sprintf("s3://%s/%s", urlHost, urlPath))
 
 		if err != nil {
