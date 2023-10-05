@@ -19,6 +19,16 @@ import (
 	"testing"
 )
 
+func assertS3Path(t *testing.T, expectedBucket, expectedPrefix string, p *s3Path) {
+	t.Helper()
+	if p.bucket != expectedBucket || p.bucketPrefix != expectedPrefix {
+		t.Fatalf(
+			`Expected bucket="%s" prefix="%s", got bucket="%s" prefix="%s"`,
+			expectedBucket, expectedPrefix, p.bucket, p.bucketPrefix,
+		)
+	}
+}
+
 func TestURLToS3Path(t *testing.T) {
 	t.Run("NoBucketName", func(t *testing.T) {
 		_, err := urlToS3Path(&url.URL{
@@ -37,9 +47,7 @@ func TestURLToS3Path(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		if p.bucket != "bucket" || p.bucketPrefix != "test" {
-			t.Fatalf("Unexpected s3Path: %v", p)
-		}
+		assertS3Path(t, "bucket", "test", p)
 	})
 	t.Run("UrlEscapedPath", func(t *testing.T) {
 		urlHost := "bucket"
@@ -55,9 +63,7 @@ func TestURLToS3Path(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		if p.bucket != urlHost || p.bucketPrefix != urlPath {
-			t.Fatalf("Unexpected s3Path: %v", p)
-		}
+		assertS3Path(t, urlHost, urlPath, p)
 	})
 }
 
