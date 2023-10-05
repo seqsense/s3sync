@@ -34,6 +34,7 @@ func urlToS3Path(url *url.URL) (*s3Path, error) {
 
 	path := url.RawPath
 	if path == "" {
+		// If the path doesn't contain any special characters, RawPath would be empty
 		path = url.Path
 	}
 
