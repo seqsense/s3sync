@@ -39,7 +39,6 @@ func TestURLToS3Path(t *testing.T) {
 			t.Fatalf("Expected error %v, got %v", errNoBucketName, err)
 		}
 	})
-
 	t.Run("Normal", func(t *testing.T) {
 		p, err := urlToS3Path(&url.URL{
 			Host: "bucket",
