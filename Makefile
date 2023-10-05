@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOCALSTACK_VERSION = 2.2.0
+LOCALSTACK_VERSION = 2.3.2
 
 .PHONY: test
 test:
@@ -41,6 +41,7 @@ fixture:
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://s3-source/foo/
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://s3-source/bar/baz/
 	aws s3 --endpoint-url http://localhost:4572 mb s3://s3-destination
+	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-escaped
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload
 	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-upload/dest_only_file
 	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload-file

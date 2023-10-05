@@ -32,10 +32,16 @@ func urlToS3Path(url *url.URL) (*s3Path, error) {
 		return nil, errNoBucketName
 	}
 
+	path := url.RawPath
+	if path == "" {
+		// If the path doesn't contain any special characters, RawPath would be empty
+		path = url.Path
+	}
+
 	return &s3Path{
 		bucket: url.Host,
 		// Using filepath.ToSlash for change backslash to slash on Windows
-		bucketPrefix: strings.TrimPrefix(filepath.ToSlash(url.Path), "/"),
+		bucketPrefix: strings.TrimPrefix(filepath.ToSlash(path), "/"),
 	}, nil
 }
 
