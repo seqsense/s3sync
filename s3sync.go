@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -100,6 +100,62 @@ func (m *Manager) Sync(source, dest string) error {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	chJob := make(chan func())
+	var wg sync.WaitGroup
+	for i := 0; i < m.nJobs; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range chJob {
+				job()
+			}
+		}()
+	}
+	defer func() {
+		close(chJob)
+		wg.Wait()
+	}()
+
+	if isS3URL(sourceURL) {
+		sourceS3Path, err := urlToS3Path(sourceURL)
+		if err != nil {
+			return err
+		}
+		if isS3URL(destURL) {
+			destS3Path, err := urlToS3Path(destURL)
+			if err != nil {
+				return err
+			}
+			return m.syncS3ToS3(ctx, chJob, sourceS3Path, destS3Path)
+		}
+		return m.syncS3ToLocal(ctx, chJob, sourceS3Path, dest)
+	}
+
+	if isS3URL(destURL) {
+		destS3Path, err := urlToS3Path(destURL)
+		if err != nil {
+			return err
+		}
+		return m.syncLocalToS3(ctx, chJob, source, destS3Path)
+	}
+
+	return errors.New("local to local sync is not supported")
+}
+
+func (m *Manager) SyncWithCtx(ctx context.Context, source, dest string) error {
+	sourceURL, err := url.Parse(source)
+	if err != nil {
+		return err
+	}
+
+	destURL, err := url.Parse(dest)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	chJob := make(chan func())
