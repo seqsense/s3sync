@@ -89,62 +89,10 @@ func New(sess *session.Session, options ...Option) *Manager {
 
 // Sync syncs the files between s3 and local disks.
 func (m *Manager) Sync(source, dest string) error {
-	sourceURL, err := url.Parse(source)
-	if err != nil {
-		return err
-	}
-
-	destURL, err := url.Parse(dest)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	chJob := make(chan func())
-	var wg sync.WaitGroup
-	for i := 0; i < m.nJobs; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for job := range chJob {
-				job()
-			}
-		}()
-	}
-	defer func() {
-		close(chJob)
-		wg.Wait()
-	}()
-
-	if isS3URL(sourceURL) {
-		sourceS3Path, err := urlToS3Path(sourceURL)
-		if err != nil {
-			return err
-		}
-		if isS3URL(destURL) {
-			destS3Path, err := urlToS3Path(destURL)
-			if err != nil {
-				return err
-			}
-			return m.syncS3ToS3(ctx, chJob, sourceS3Path, destS3Path)
-		}
-		return m.syncS3ToLocal(ctx, chJob, sourceS3Path, dest)
-	}
-
-	if isS3URL(destURL) {
-		destS3Path, err := urlToS3Path(destURL)
-		if err != nil {
-			return err
-		}
-		return m.syncLocalToS3(ctx, chJob, source, destS3Path)
-	}
-
-	return errors.New("local to local sync is not supported")
+	return m.SyncWithContext(context.Background(), source, dest)
 }
 
-func (m *Manager) SyncWithCtx(ctx context.Context, source, dest string) error {
+func (m *Manager) SyncWithContext(ctx context.Context, source, dest string) error {
 	sourceURL, err := url.Parse(source)
 	if err != nil {
 		return err
