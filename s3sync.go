@@ -253,7 +253,7 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 }
 
 func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
-	println("Copying", file.name, "to", destPath.String())
+	println("Copying", file.name, "to", destPath.String(), " (",file.name,")")
 	if m.dryrun {
 		return nil
 	}
