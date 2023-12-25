@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -253,15 +253,17 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 }
 
 func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
-	println("Copying", file.name, "to", destPath.String())
+	copySource := sourcePath.bucket + "/" + sourcePath.bucketPrefix + "/" + file.name
+	destinationKey := destPath.bucketPrefix + "/" + file.name
+	println("Copying from", copySource, "to key", destinationKey, "in bucket", destPath.bucket)
 	if m.dryrun {
 		return nil
 	}
 
 	_, err := m.s3.CopyObject(&s3.CopyObjectInput{
 		Bucket:     aws.String(destPath.bucket),
-		CopySource: aws.String(sourcePath.bucket + "/" + file.name),
-		Key:        aws.String(file.name),
+		CopySource: aws.String(copySource),
+		Key:        aws.String(destinationKey),
 		ACL:        m.acl,
 	})
 
