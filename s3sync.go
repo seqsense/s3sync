@@ -268,7 +268,6 @@ func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3
 	})
 
 	if err != nil {
-		println(err)
 		return err
 	}
 
