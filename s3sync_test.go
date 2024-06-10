@@ -167,7 +167,7 @@ func TestS3sync(t *testing.T) {
 				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
 			}
 		}
-		if objs[1].path != "hoge/baz/README.md" {
+		if objs[0].path != "hoge/baz/README.md" {
 			t.Error("Unexpected keys", objs)
 		}
 	})
