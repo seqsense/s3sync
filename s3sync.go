@@ -253,8 +253,8 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 }
 
 func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
-	copySource := sourcePath.bucket + "/" + sourcePath.bucketPrefix + "/" + file.name
-	destinationKey := destPath.bucketPrefix + "/" + file.name
+	copySource := filepath.ToSlash(filepath.Join(sourcePath.bucket, sourcePath.bucketPrefix, file.name))
+	destinationKey := filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
 	println("Copying from", copySource, "to key", destinationKey, "in bucket", destPath.bucket)
 	if m.dryrun {
 		return nil
