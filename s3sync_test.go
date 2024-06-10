@@ -154,11 +154,11 @@ func TestS3sync(t *testing.T) {
 	})
 
 	t.Run("S3ToS3CopyWithPrefix", func(t *testing.T) {
-		if err := New(getSession()).Sync("s3://s3-source/bar", "s3://s3-destination/hoge"); err != nil {
+		if err := New(getSession()).Sync("s3://s3-source/bar", "s3://s3-destination2/hoge"); err != nil {
 			t.Fatal("Sync should be successful", err)
 		}
 
-		objs := listObjectsSorted(t, "s3-destination")
+		objs := listObjectsSorted(t, "s3-destination2")
 		if n := len(objs); n != 1 {
 			t.Fatalf("Number of the files should be 1 (result: %v)", objs)
 		}
