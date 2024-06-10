@@ -38,16 +38,6 @@ func TestS3syncNotImplemented(t *testing.T) {
 	}
 }
 
-func TestS3ToS3(t *testing.T) {
-	m := New(getSession())
-
-	err := m.Sync("s3://s3-source", "s3://s3-destination")
-
-	if err != nil {
-		t.Fatal(err.Error())
-	}
-}
-
 func TestS3sync(t *testing.T) {
 	data, err := ioutil.ReadFile(dummyFilename)
 	if err != nil {
@@ -159,6 +149,25 @@ func TestS3sync(t *testing.T) {
 		if objs[0].path != "README.md" ||
 			objs[1].path != "bar/baz/README.md" ||
 			objs[2].path != "foo/README.md" {
+			t.Error("Unexpected keys", objs)
+		}
+	})
+
+	t.Run("S3ToS3CopyWithPrefix", func(t *testing.T) {
+		if err := New(getSession()).Sync("s3://s3-source/bar", "s3://s3-destination2/hoge"); err != nil {
+			t.Fatal("Sync should be successful", err)
+		}
+
+		objs := listObjectsSorted(t, "s3-destination2")
+		if n := len(objs); n != 1 {
+			t.Fatalf("Number of the files should be 1 (result: %v)", objs)
+		}
+		for _, obj := range objs {
+			if obj.size != dummyFileSize {
+				t.Errorf("Object size should be %d, actual %d", dummyFileSize, obj.size)
+			}
+		}
+		if objs[0].path != "hoge/baz/README.md" {
 			t.Error("Unexpected keys", objs)
 		}
 	})
