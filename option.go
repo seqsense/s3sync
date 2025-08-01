@@ -13,7 +13,7 @@
 
 package s3sync
 
-import "github.com/aws/aws-sdk-go/service/s3/s3manager"
+import "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 
 const (
 	// Default number of parallel file sync jobs.
@@ -66,15 +66,15 @@ func WithContentType(mime string) Option {
 	}
 }
 
-// WithDownloaderOptions sets underlying s3manager's options.
-func WithDownloaderOptions(opts ...func(*s3manager.Downloader)) Option {
+// WithDownloaderOptions sets underlying s3 manager's options.
+func WithDownloaderOptions(opts ...func(*manager.Downloader)) Option {
 	return func(m *Manager) {
 		m.downloaderOpts = opts
 	}
 }
 
-// WithUploaderOptions sets underlying s3manager's options.
-func WithUploaderOptions(opts ...func(*s3manager.Uploader)) Option {
+// WithUploaderOptions sets underlying s3 manager's options.
+func WithUploaderOptions(opts ...func(*manager.Uploader)) Option {
 	return func(m *Manager) {
 		m.uploaderOpts = opts
 	}
