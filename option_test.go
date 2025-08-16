@@ -14,66 +14,64 @@
 package s3sync
 
 import (
-	"testing"
+  "context"
+  "testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+  "github.com/aws/aws-sdk-go-v2/config"
+  "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 )
 
 func TestWithParallel(t *testing.T) {
-	sess := session.New(&aws.Config{
-		Credentials: credentials.AnonymousCredentials,
-		Region:      aws.String("dummy"),
-	})
-
-	m := New(sess, WithParallel(2))
-	if m.nJobs != 2 {
-		t.Fatal("Manager.nJobs must be configured by WithParallel option")
-	}
+  cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+  if err != nil {
+    t.Fatal(err)
+  }
+  m := New(cfg, WithParallel(2))
+  if m.nJobs != 2 {
+    t.Fatal("Manager.nJobs must be configured by WithParallel option")
+  }
 }
 
 func TestWithACL(t *testing.T) {
-	sess := session.New(&aws.Config{
-		Credentials: credentials.AnonymousCredentials,
-		Region:      aws.String("dummy"),
-	})
+  cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+  if err != nil {
+    t.Fatal(err)
+  }
 
-	t.Run("Nil", func(t *testing.T) {
-		m := New(sess)
-		if m.acl != nil {
-			t.Fatal("Manager.acl must be nil if initialized with WithACL")
-		}
-	})
-	t.Run("WithACL", func(t *testing.T) {
-		m := New(sess, WithACL("test"))
-		if *m.acl != "test" {
-			t.Fatal("Manager.acl must be configured by WithParallel option")
-		}
-	})
+  t.Run("Nil", func(t *testing.T) {
+    m := New(cfg)
+    if m.acl != nil {
+      t.Fatal("Manager.acl must be nil if initialized with WithACL")
+    }
+  })
+  t.Run("WithACL", func(t *testing.T) {
+    m := New(cfg, WithACL("test"))
+    if *m.acl != "test" {
+      t.Fatal("Manager.acl must be configured by WithParallel option")
+    }
+  })
 }
 
 func TestUploaderDownloaderOptions(t *testing.T) {
-	sess := session.New(&aws.Config{
-		Credentials: credentials.AnonymousCredentials,
-		Region:      aws.String("dummy"),
-	})
+  cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+  if err != nil {
+    t.Fatal(err)
+  }
 
-	t.Run("Uploader", func(t *testing.T) {
-		m := New(sess, WithUploaderOptions(
-			func(u *s3manager.Uploader) {},
-		))
-		if len(m.uploaderOpts) != 1 {
-			t.Fatal("Manager.uploaderOpts must have a option")
-		}
-	})
-	t.Run("Downloader", func(t *testing.T) {
-		m := New(sess, WithDownloaderOptions(
-			func(d *s3manager.Downloader) {},
-		))
-		if len(m.downloaderOpts) != 1 {
-			t.Fatal("Manager.downloaderOpts must have a option")
-		}
-	})
+  t.Run("Uploader", func(t *testing.T) {
+    m := New(cfg, WithUploaderOptions(
+      func(u *manager.Uploader) {},
+    ))
+    if len(m.uploaderOpts) != 1 {
+      t.Fatal("Manager.uploaderOpts must have a option")
+    }
+  })
+  t.Run("Downloader", func(t *testing.T) {
+    m := New(cfg, WithDownloaderOptions(
+      func(d *manager.Downloader) {},
+    ))
+    if len(m.downloaderOpts) != 1 {
+      t.Fatal("Manager.downloaderOpts must have a option")
+    }
+  })
 }

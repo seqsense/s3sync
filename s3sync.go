@@ -87,13 +87,10 @@ type fileOp struct {
 func New(cfg aws.Config, options ...Option) *Manager {
   m := &Manager{
 	s3:        s3.NewFromConfig(cfg),
+	rawS3:     s3.NewFromConfig(cfg),
 	nJobs:     DefaultParallel,
 	guessMime: true,
   }
-  // Ensure rawS3 is set if s3client is a *s3.Client
-//   if c, ok := s3client.(*s3.Client); ok {
-// 	m.rawS3 = c
-//   }
   for _, o := range options {
 	o(m)
   }
