@@ -13,34 +13,32 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"time"
+  "context"
+  "fmt"
+  "os"
+  "time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/seqsense/s3sync"
+  "github.com/aws/aws-sdk-go-v2/config"
+  "github.com/seqsense/s3sync"
 )
 
-// Usage: go run ./examples/simple s3://example-bucket/path/to/source path/to/dest
+// Usage: go run ./examples/statistics s3://example-bucket/path/to/source path/to/dest
 func main() {
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("ap-northeast-1"),
-	})
-	if err != nil {
-		panic(err)
-	}
+  cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-southeast-2"))
+  if err != nil {
+	  panic(err)
+  }
 
-	fmt.Printf("from=%s\n", os.Args[1])
-	fmt.Printf("to=%s\n", os.Args[2])
+  fmt.Printf("from=%s\n", os.Args[1])
+  fmt.Printf("to=%s\n", os.Args[2])
 
-	startSync := time.Now()
-	manager := s3sync.New(sess)
-	err = manager.Sync(os.Args[1], os.Args[2])
-	syncTime := (time.Now().UnixNano() - startSync.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond))
-	if err != nil {
-		panic(err)
-	}
-	s := manager.GetStatistics()
-	fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d millisecond(s)\nFiles deleted: %d\n", s.Bytes, s.Files, syncTime, s.DeletedFiles)
+  startSync := time.Now()
+  manager := s3sync.New(cfg)
+  err = manager.Sync(os.Args[1], os.Args[2])
+  syncTime := (time.Now().UnixNano() - startSync.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond))
+  if err != nil {
+	panic(err)
+  }
+  s := manager.GetStatistics()
+  fmt.Printf("Sync results:\nBytes written: %d\nFiles uploaded: %d\nTime spent: %d millisecond(s)\nFiles deleted: %d\n", s.Bytes, s.Files, syncTime, s.DeletedFiles)
 }
