@@ -13,30 +13,30 @@
 package s3sync
 
 import (
-  "context"
-  "errors"
-  "net/url"
-  "os"
-  "path/filepath"
-  "strings"
-  "sync"
-  "time"
+	"context"
+	"errors"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
-  "github.com/aws/aws-sdk-go-v2/aws"
-  "github.com/aws/aws-sdk-go-v2/service/s3"
-  "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
-  "github.com/aws/aws-sdk-go-v2/service/s3/types"
-  "github.com/gabriel-vasile/mimetype"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/gabriel-vasile/mimetype"
 )
 
 // Manager manages the sync operation.
 // S3API defines the subset of s3.Client methods used by Manager, for testability.
 type S3API interface {
-  CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
-  DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
-  ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
-  GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-  PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
+	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 }
 
 type Manager struct {
@@ -85,16 +85,16 @@ type fileOp struct {
 
 // New returns a new Manager.
 func New(cfg aws.Config, options ...Option) *Manager {
-  m := &Manager{
-	s3:        s3.NewFromConfig(cfg),
-	rawS3:     s3.NewFromConfig(cfg),
-	nJobs:     DefaultParallel,
-	guessMime: true,
-  }
-  for _, o := range options {
-	o(m)
-  }
-  return m
+	m := &Manager{
+		s3:        s3.NewFromConfig(cfg),
+		rawS3:     s3.NewFromConfig(cfg),
+		nJobs:     DefaultParallel,
+		guessMime: true,
+	}
+	for _, o := range options {
+		o(m)
+	}
+	return m
 }
 
 // Sync syncs the files between s3 and local disks.
