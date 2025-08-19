@@ -30,8 +30,8 @@ import (
 )
 
 // Manager manages the sync operation.
-// S3API defines the subset of s3.Client methods used by Manager, for testability.
-type S3API interface {
+// s3API defines the subset of s3.Client methods used by Manager, for testability.
+type s3API interface {
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
@@ -40,7 +40,7 @@ type S3API interface {
 }
 
 type Manager struct {
-	s3             S3API
+	s3             s3API
 	rawS3          *s3.Client
 	nJobs          int
 	del            bool
