@@ -13,7 +13,10 @@
 
 package s3sync
 
-import "github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+import (
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+)
 
 const (
 	// Default number of parallel file sync jobs.
@@ -38,10 +41,10 @@ func WithDelete() Option {
 }
 
 // WithACL sets Access Control List string for uploading.
-func WithACL(acl string) Option {
+func WithACL(acl types.ObjectCannedACL) Option {
 	return func(m *Manager) {
 		acl := acl
-		m.acl = &acl
+		m.acl = acl
 	}
 }
 

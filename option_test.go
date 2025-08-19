@@ -14,17 +14,17 @@
 package s3sync
 
 import (
-	"context"
 	"testing"
 
-	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 )
 
 func TestWithParallel(t *testing.T) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-	if err != nil {
-		t.Fatal(err)
+	cfg := aws.Config{
+		Credentials:  credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+		Region:       "ap-northeast-1",
 	}
 	m := New(cfg, WithParallel(2))
 	if m.nJobs != 2 {
@@ -33,31 +33,29 @@ func TestWithParallel(t *testing.T) {
 }
 
 func TestWithACL(t *testing.T) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-	if err != nil {
-		t.Fatal(err)
+	cfg := aws.Config{
+		Credentials:  credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+		Region:       "ap-northeast-1",
 	}
-
 	t.Run("Nil", func(t *testing.T) {
 		m := New(cfg)
-		if m.acl != nil {
+		if m.acl != "" {
 			t.Fatal("Manager.acl must be nil if initialized with WithACL")
 		}
 	})
 	t.Run("WithACL", func(t *testing.T) {
 		m := New(cfg, WithACL("test"))
-		if *m.acl != "test" {
+		if m.acl != "test" {
 			t.Fatal("Manager.acl must be configured by WithParallel option")
 		}
 	})
 }
 
 func TestUploaderDownloaderOptions(t *testing.T) {
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
-	if err != nil {
-		t.Fatal(err)
+	cfg := aws.Config{
+		Credentials:  credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+		Region:       "ap-northeast-1",
 	}
-
 	t.Run("Uploader", func(t *testing.T) {
 		m := New(cfg, WithUploaderOptions(
 			func(u *manager.Uploader) {},

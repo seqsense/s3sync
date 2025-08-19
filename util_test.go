@@ -21,28 +21,24 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const awsRegion = "ap-northeast-1"
 
 func getSession() aws.Config {
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion(awsRegion),
-		config.WithEndpointResolverWithOptions(
-			aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-				return aws.Endpoint{
-					URL:               "http://localhost:4572",
-					HostnameImmutable: true,
-				}, nil
-			}),
-		),
-	)
-	if err != nil {
-		panic(err)
-	}
-	return cfg
+	return aws.Config{
+        Credentials: credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+        Region:      awsRegion,
+        EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(
+            func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+                return aws.Endpoint{
+                    URL:               "http://localhost:4572",
+                    HostnameImmutable: true,
+                }, nil
+            }),
+    }
 }
 
 type s3Object struct {

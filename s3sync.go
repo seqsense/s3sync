@@ -29,9 +29,10 @@ import (
 	"github.com/gabriel-vasile/mimetype"
 )
 
-// Manager manages the sync operation.
 // s3API defines the subset of s3.Client methods used by Manager, for testability.
 type s3API interface {
+	manager.DownloadAPIClient
+	manager.UploadAPIClient
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
@@ -39,13 +40,13 @@ type s3API interface {
 	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
 }
 
+// Manager manages the sync operation.
 type Manager struct {
 	s3             s3API
-	rawS3          *s3.Client
 	nJobs          int
 	del            bool
 	dryrun         bool
-	acl            *string
+	acl            types.ObjectCannedACL
 	guessMime      bool
 	contentType    *string
 	downloaderOpts []func(*manager.Downloader)
@@ -87,7 +88,6 @@ type fileOp struct {
 func New(cfg aws.Config, options ...Option) *Manager {
 	m := &Manager{
 		s3:        s3.NewFromConfig(cfg),
-		rawS3:     s3.NewFromConfig(cfg),
 		nJobs:     DefaultParallel,
 		guessMime: true,
 	}
@@ -272,8 +272,8 @@ func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3
 
 	// Convert ACL if specified
 	var acl types.ObjectCannedACL
-	if m.acl != nil {
-		acl = types.ObjectCannedACL(*m.acl)
+	if m.acl != "" {
+		acl = types.ObjectCannedACL(m.acl)
 	}
 
 	_, err := m.s3.CopyObject(ctx, &s3.CopyObjectInput{
@@ -325,7 +325,7 @@ func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Pa
 		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
-	c := manager.NewDownloader(m.rawS3, m.downloaderOpts...)
+	c := manager.NewDownloader(m.s3, m.downloaderOpts...)
 	written, err := c.Download(ctx, writer, &s3.GetObjectInput{
 		Bucket: &sourcePath.bucket,
 		Key:    &sourceFile,
@@ -400,15 +400,16 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 	if err != nil {
 		return err
 	}
+
 	defer reader.Close()
 
 	var acl types.ObjectCannedACL
-	if m.acl != nil {
-		acl = types.ObjectCannedACL(*m.acl)
+	if m.acl != "" {
+		acl = types.ObjectCannedACL(m.acl)
 	}
 
 	_, err = manager.NewUploader(
-		m.rawS3,
+		m.s3,
 		m.uploaderOpts...
 	).Upload(ctx, &s3.PutObjectInput{
 		Bucket:      &destFile.bucket,
