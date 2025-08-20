@@ -270,17 +270,11 @@ func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3
 		return nil
 	}
 
-	// Convert ACL if specified
-	var acl types.ObjectCannedACL
-	if m.acl != "" {
-		acl = types.ObjectCannedACL(m.acl)
-	}
-
 	_, err := m.s3.CopyObject(ctx, &s3.CopyObjectInput{
 		Bucket:     &destPath.bucket,
 		CopySource: &copySource,
 		Key:        &destinationKey,
-		ACL:        acl,
+		ACL:        m.acl,
 	})
 
 	if err != nil {
@@ -403,18 +397,13 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 
 	defer reader.Close()
 
-	var acl types.ObjectCannedACL
-	if m.acl != "" {
-		acl = types.ObjectCannedACL(m.acl)
-	}
-
 	_, err = manager.NewUploader(
 		m.s3,
 		m.uploaderOpts...
 	).Upload(ctx, &s3.PutObjectInput{
 		Bucket:      &destFile.bucket,
 		Key:         &destFile.bucketPrefix,
-		ACL:         acl,
+		ACL:         m.acl,
 		Body:        reader,
 		ContentType: contentType,
 	})
