@@ -1,12 +1,13 @@
 {
   "extends": [
-    "config:base",
+    "config:recommended",
     "schedule:weekends"
   ],
-  "regexManagers": [
+  "customManagers": [
     {
-      "fileMatch": [
-        "^Makefile$"
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/"
       ],
       "matchStrings": [
         "LOCALSTACK_VERSION\\s*=\\s*(?<currentValue>.*)"
@@ -21,25 +22,27 @@
   ],
   "packageRules": [
     {
-      "packagePatterns": [
-        "^golang.org/x/"
-      ],
       "schedule": [
         "on the first day of the month"
+      ],
+      "matchPackageNames": [
+        "/^golang.org/x//"
       ]
     },
     {
-      "packagePatterns": [
-        "^github.com/aws/aws-sdk-go"
-      ],
-      "separateMinorPatch": true
+      "separateMinorPatch": true,
+      "matchPackageNames": [
+        "/^github.com/aws/aws-sdk-go/"
+      ]
     },
     {
-      "packagePatterns": [
-        "^github.com/aws/aws-sdk-go"
+      "matchUpdateTypes": [
+        "patch"
       ],
-      "matchUpdateTypes": ["patch"],
-      "automerge": true
+      "automerge": true,
+      "matchPackageNames": [
+        "/^github.com/aws/aws-sdk-go/"
+      ]
     }
   ],
   "timezone": "Asia/Tokyo"
