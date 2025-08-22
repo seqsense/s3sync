@@ -44,7 +44,7 @@ func main() {
 
 	s3sync.SetLogger(&Logger{})
 
-	err = s3sync.New(cfg).Sync(os.Args[1], os.Args[2])
+	err = s3sync.New(cfg).Sync(context.TODO(), os.Args[1], os.Args[2])
 	if err != nil {
 		panic(err)
 	}

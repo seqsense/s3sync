@@ -31,7 +31,7 @@ func main() {
 	fmt.Printf("from=%s\n", os.Args[1])
 	fmt.Printf("to=%s\n", os.Args[2])
 
-	err = s3sync.New(cfg).Sync(os.Args[1], os.Args[2])
+	err = s3sync.New(cfg).Sync(context.TODO(), os.Args[1], os.Args[2])
 	if err != nil {
 		panic(err)
 	}
