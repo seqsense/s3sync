@@ -13,26 +13,32 @@
 package s3sync
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const awsRegion = "ap-northeast-1"
 
-func getSession() *session.Session {
-	sess, _ := session.NewSession(&aws.Config{
-		Region:           aws.String(awsRegion),
-		S3ForcePathStyle: aws.Bool(true),
-		Endpoint:         aws.String("http://localhost:4572"),
-	})
-	return sess
+func getSession() aws.Config {
+	return aws.Config{
+        Credentials: credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+        Region:      awsRegion,
+        EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(
+            func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+                return aws.Endpoint{
+                    URL:               "http://localhost:4572",
+                    HostnameImmutable: true,
+                }, nil
+            }),
+    }
 }
 
 type s3Object struct {
@@ -54,13 +60,9 @@ func (l s3ObjectList) Swap(i, j int) {
 }
 
 func deleteObject(t *testing.T, bucket, key string) {
-	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String(awsRegion),
-		Endpoint:         aws.String("http://localhost:4572"),
-		S3ForcePathStyle: aws.Bool(true),
-	}))
-
-	_, err := svc.DeleteObject(&s3.DeleteObjectInput{
+	svc := getSession()
+	s3client := s3.NewFromConfig(svc)
+	_, err := s3client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: &bucket,
 		Key:    &key,
 	})
@@ -70,32 +72,34 @@ func deleteObject(t *testing.T, bucket, key string) {
 }
 
 func listObjectsSorted(t *testing.T, bucket string) []s3Object {
-	svc := s3.New(session.New(&aws.Config{
-		Region:           aws.String(awsRegion),
-		Endpoint:         aws.String("http://localhost:4572"),
-		S3ForcePathStyle: aws.Bool(true),
-	}))
-
-	result, err := svc.ListObjectsV2(&s3.ListObjectsV2Input{
+	svc := getSession()
+	maxKeys := int32(100)
+	s3client := s3.NewFromConfig(svc)
+	result, err := s3client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
 		Bucket:  &bucket,
-		MaxKeys: aws.Int64(100),
+		MaxKeys: &maxKeys,
 	})
 	if err != nil {
 		t.Fatal("ListObjects failed", err)
 	}
 	var objs []s3Object
 	for _, obj := range result.Contents {
-		o, err := svc.GetObject(&s3.GetObjectInput{
+		s3client := s3.NewFromConfig(svc)
+		o, err := s3client.GetObject(context.TODO(), &s3.GetObjectInput{
 			Bucket: &bucket,
 			Key:    obj.Key,
 		})
 		if err != nil {
 			t.Fatal("GetObject failed", err)
 		}
+		contentType := ""
+		if o.ContentType != nil {
+			contentType = *o.ContentType
+		}
 		objs = append(objs, s3Object{
 			path:        *obj.Key,
 			size:        int(*obj.Size),
-			contentType: *o.ContentType,
+			contentType: contentType,
 		})
 	}
 	sort.Sort(s3ObjectList(objs))

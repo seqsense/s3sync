@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -13,11 +13,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/seqsense/s3sync"
 )
 
@@ -32,11 +32,9 @@ func (l *Logger) Logf(format string, v ...interface{}) {
 	fmt.Printf(format, v...)
 }
 
-// Usage: go run ./examples/simple s3://example-bucket/path/to/source path/to/dest
+// Usage: go run ./examples/logger s3://example-bucket/path/to/source path/to/dest
 func main() {
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("ap-northeast-1"),
-	})
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
 	if err != nil {
 		panic(err)
 	}
@@ -46,7 +44,7 @@ func main() {
 
 	s3sync.SetLogger(&Logger{})
 
-	err = s3sync.New(sess).Sync(os.Args[1], os.Args[2])
+	err = s3sync.New(cfg).Sync(os.Args[1], os.Args[2])
 	if err != nil {
 		panic(err)
 	}

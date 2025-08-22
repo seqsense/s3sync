@@ -22,25 +22,35 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
-	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gabriel-vasile/mimetype"
 )
 
+// s3API defines the subset of s3.Client methods used by Manager, for testability.
+type s3API interface {
+	manager.DownloadAPIClient
+	manager.UploadAPIClient
+	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
+	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
+	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
+	GetObject(ctx context.Context, params *s3.GetObjectInput, optFns ...func(*s3.Options)) (*s3.GetObjectOutput, error)
+	PutObject(ctx context.Context, params *s3.PutObjectInput, optFns ...func(*s3.Options)) (*s3.PutObjectOutput, error)
+}
+
 // Manager manages the sync operation.
 type Manager struct {
-	s3             s3iface.S3API
+	s3             s3API
 	nJobs          int
 	del            bool
 	dryrun         bool
-	acl            *string
+	acl            types.ObjectCannedACL
 	guessMime      bool
 	contentType    *string
-	downloaderOpts []func(*s3manager.Downloader)
-	uploaderOpts   []func(*s3manager.Uploader)
+	downloaderOpts []func(*manager.Downloader)
+	uploaderOpts   []func(*manager.Uploader)
 	statistics     SyncStatistics
 }
 
@@ -75,9 +85,9 @@ type fileOp struct {
 }
 
 // New returns a new Manager.
-func New(sess *session.Session, options ...Option) *Manager {
+func New(cfg aws.Config, options ...Option) *Manager {
 	m := &Manager{
-		s3:        s3.New(sess),
+		s3:        s3.NewFromConfig(cfg),
 		nJobs:     DefaultParallel,
 		guessMime: true,
 	}
@@ -205,11 +215,11 @@ func (m *Manager) syncLocalToS3(ctx context.Context, chJob chan func(), sourcePa
 			}
 			switch source.op {
 			case opUpdate:
-				if err := m.upload(source.fileInfo, sourcePath, destPath); err != nil {
+				if err := m.upload(ctx, source.fileInfo, sourcePath, destPath); err != nil {
 					errs.Append(err)
 				}
 			case opDelete:
-				if err := m.deleteRemote(source.fileInfo, destPath); err != nil {
+				if err := m.deleteRemote(ctx, source.fileInfo, destPath); err != nil {
 					errs.Append(err)
 				}
 			}
@@ -237,11 +247,11 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 			}
 			switch source.op {
 			case opUpdate:
-				if err := m.download(source.fileInfo, sourcePath, destPath); err != nil {
+				if err := m.download(ctx, source.fileInfo, sourcePath, destPath); err != nil {
 					errs.Append(err)
 				}
 			case opDelete:
-				if err := m.deleteLocal(source.fileInfo, destPath); err != nil {
+				if err := m.deleteLocal(ctx, source.fileInfo, destPath); err != nil {
 					errs.Append(err)
 				}
 			}
@@ -260,10 +270,10 @@ func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3
 		return nil
 	}
 
-	_, err := m.s3.CopyObject(&s3.CopyObjectInput{
-		Bucket:     aws.String(destPath.bucket),
-		CopySource: aws.String(copySource),
-		Key:        aws.String(destinationKey),
+	_, err := m.s3.CopyObject(ctx, &s3.CopyObjectInput{
+		Bucket:     &destPath.bucket,
+		CopySource: &copySource,
+		Key:        &destinationKey,
 		ACL:        m.acl,
 	})
 
@@ -275,7 +285,7 @@ func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3
 	return nil
 }
 
-func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) error {
+func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath string) error {
 	var targetFilename string
 	if !strings.HasSuffix(destPath, "/") && file.singleFile {
 		// Destination path is not a directory and source is a single file.
@@ -309,10 +319,10 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
 	}
 
-	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
-	written, err := c.Download(writer, &s3.GetObjectInput{
-		Bucket: aws.String(sourcePath.bucket),
-		Key:    aws.String(sourceFile),
+	c := manager.NewDownloader(m.s3, m.downloaderOpts...)
+	written, err := c.Download(ctx, writer, &s3.GetObjectInput{
+		Bucket: &sourcePath.bucket,
+		Key:    &sourceFile,
 	})
 	if err != nil {
 		return err
@@ -326,7 +336,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	return nil
 }
 
-func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
+func (m *Manager) deleteLocal(ctx context.Context, file *fileInfo, destPath string) error {
 	var targetFilename string
 	if !strings.HasSuffix(destPath, "/") && file.singleFile {
 		// Destination path is not a directory and source is a single file.
@@ -347,7 +357,7 @@ func (m *Manager) deleteLocal(file *fileInfo, destPath string) error {
 	return nil
 }
 
-func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) error {
+func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string, destPath *s3Path) error {
 	var sourceFilename string
 	if file.singleFile {
 		sourceFilename = sourcePath
@@ -387,12 +397,12 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 
 	defer reader.Close()
 
-	_, err = s3manager.NewUploaderWithClient(
+	_, err = manager.NewUploader(
 		m.s3,
-		m.uploaderOpts...,
-	).Upload(&s3manager.UploadInput{
-		Bucket:      aws.String(destFile.bucket),
-		Key:         aws.String(destFile.bucketPrefix),
+		m.uploaderOpts...
+	).Upload(ctx, &s3.PutObjectInput{
+		Bucket:      &destFile.bucket,
+		Key:         &destFile.bucketPrefix,
 		ACL:         m.acl,
 		Body:        reader,
 		ContentType: contentType,
@@ -404,7 +414,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	return nil
 }
 
-func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
+func (m *Manager) deleteRemote(ctx context.Context, file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
@@ -417,9 +427,9 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 		return nil
 	}
 
-	_, err := m.s3.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(destFile.bucket),
-		Key:    aws.String(destFile.bucketPrefix),
+	_, err := m.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: &destFile.bucket,
+		Key:    &destFile.bucketPrefix,
 	})
 	if err != nil {
 		return err
@@ -447,7 +457,7 @@ func (m *Manager) listS3Files(ctx context.Context, path *s3Path) chan *fileInfo 
 
 // listS3FileWithToken lists (send to the result channel) the s3 files from the given continuation token.
 func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, path *s3Path, token *string) *string {
-	list, err := m.s3.ListObjectsV2(&s3.ListObjectsV2Input{
+	list, err := m.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:            &path.bucket,
 		Prefix:            &path.bucketPrefix,
 		ContinuationToken: token,

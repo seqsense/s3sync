@@ -848,7 +848,7 @@ func TestS3sync_GuessMime(t *testing.T) {
 		},
 		"NoGuess": {
 			options:  []Option{WithoutGuessMimeType()},
-			expected: "binary/octet-stream",
+			expected: "application/octet-stream",
 		},
 		"Overwrite": {
 			options:  []Option{WithContentType("test/dummy")},
