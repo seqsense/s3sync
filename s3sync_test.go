@@ -626,7 +626,7 @@ func TestPartialS3sync(t *testing.T) {
 	}
 
 	var syncCount uint32
-	SetLogger(createLoggerWithLogFunc(func(v ...interface{}) {
+	SetLogger(createLoggerWithLogFunc(func(string, ...any) {
 		atomic.AddUint32(&syncCount, 1) // This function is called once per one download
 	}))
 
@@ -876,15 +876,13 @@ func TestS3sync_GuessMime(t *testing.T) {
 }
 
 type dummyLogger struct {
-	log func(...interface{})
+	logf func(string, ...any)
 }
 
-func (d *dummyLogger) Log(v ...interface{}) {
-	d.log(v...)
-}
-func (d *dummyLogger) Logf(format string, v ...interface{}) {
+func (d *dummyLogger) Logf(format string, v ...any) {
+	d.logf(format, v...)
 }
 
-func createLoggerWithLogFunc(log func(v ...interface{})) LoggerIF {
-	return &dummyLogger{log: log}
+func createLoggerWithLogFunc(log func(format string, v ...any)) LoggerIF {
+	return &dummyLogger{logf: log}
 }

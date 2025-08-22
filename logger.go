@@ -3,7 +3,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+//	http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,11 +17,8 @@ import "log"
 // LoggerIF is the logger interface which this library requires.
 type LoggerIF interface {
 	// Log inserts a log entry. Arguments are handled in the manner
-	// of fmt.Print.
-	Log(v ...interface{})
-	// Log inserts a log entry. Arguments are handled in the manner
 	// of fmt.Printf.
-	Logf(format string, v ...interface{})
+	Logf(format string, v ...any)
 }
 
 // Logger is the logger instance.
@@ -32,10 +29,10 @@ func SetLogger(l LoggerIF) {
 	logger = l
 }
 
-func println(v ...interface{}) {
+func logf(format string, v ...any) {
 	if logger == nil {
-		log.Println(v...)
+		log.Printf(format, v...)
 		return
 	}
-	logger.Log(v...)
+	logger.Logf(format, v...)
 }
