@@ -39,7 +39,7 @@ jobs:
           make cover # run test with coverage
         env:
           AWS_REGION: ap-northeast-1 # for awscli
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           file: ./cover.out
           token: ${{ secrets.CODECOV_TOKEN }}
