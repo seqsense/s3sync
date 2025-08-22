@@ -16,6 +16,7 @@ package s3sync
 import (
 	"errors"
 	"net/url"
+	"path"
 	"path/filepath"
 	"strings"
 )
@@ -47,4 +48,8 @@ func urlToS3Path(url *url.URL) (*s3Path, error) {
 
 func (p *s3Path) String() string {
 	return "s3://" + p.bucket + "/" + p.bucketPrefix
+}
+
+func (p *s3Path) joinedURL(s string) string {
+	return "s3://" + p.bucket + "/" + path.Join(p.bucketPrefix, s)
 }
