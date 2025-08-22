@@ -47,7 +47,7 @@ s3sync.SetLogger(&CustomLogger{})
 ...
 ```
 
-The logger needs to implement `Log` and `Logf` methods. See the godoc for details.
+The logger needs to implement `Logf` methods. See the godoc for details.
 
 ## Sets up the parallelism
 
