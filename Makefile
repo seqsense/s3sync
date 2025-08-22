@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOCALSTACK_VERSION = 3.8.0
+LOCALSTACK_VERSION = 4.7.0
 
 .PHONY: test
 test:
