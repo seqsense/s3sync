@@ -34,7 +34,7 @@ func main() {
 
 	startSync := time.Now()
 	manager := s3sync.New(cfg)
-	err = manager.Sync(os.Args[1], os.Args[2])
+	err = manager.Sync(context.TODO(), os.Args[1], os.Args[2])
 	syncTime := (time.Now().UnixNano() - startSync.UnixNano()) / (int64(time.Millisecond) / int64(time.Nanosecond))
 	if err != nil {
 		panic(err)
