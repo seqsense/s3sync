@@ -260,7 +260,9 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
 	copySource := filepath.ToSlash(filepath.Join(sourcePath.bucket, sourcePath.bucketPrefix, file.name))
 	destinationKey := filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
-	println("Copying from", copySource, "to key", destinationKey, "in bucket", destPath.bucket)
+
+	logf("copy: %s to %s", sourcePath.joinedURL(file.name), destPath.joinedURL(file.name))
+
 	if m.dryrun {
 		return nil
 	}
@@ -290,7 +292,8 @@ func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Pa
 	}
 	targetDir := filepath.Dir(targetFilename)
 
-	println("Downloading", file.name, "to", targetFilename)
+	logf("download: %s to %s", sourcePath.joinedURL(file.name), targetFilename)
+
 	if m.dryrun {
 		return nil
 	}
@@ -340,7 +343,8 @@ func (m *Manager) deleteLocal(ctx context.Context, file *fileInfo, destPath stri
 		targetFilename = filepath.Join(destPath, file.name)
 	}
 
-	println("Deleting", targetFilename)
+	logf("delete: %s", targetFilename)
+
 	if m.dryrun {
 		return nil
 	}
@@ -367,7 +371,8 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
 	}
 
-	println("Uploading", file.name, "to", destFile.String())
+	logf("upload: %s to %s", file.name, destFile.String())
+
 	if m.dryrun {
 		return nil
 	}
@@ -417,7 +422,8 @@ func (m *Manager) deleteRemote(ctx context.Context, file *fileInfo, destPath *s3
 		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
 	}
 
-	println("Deleting", destFile.String())
+	logf("delete: %s", destFile.String())
+
 	if m.dryrun {
 		return nil
 	}

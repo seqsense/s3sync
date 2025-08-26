@@ -24,12 +24,8 @@ import (
 type Logger struct {
 }
 
-func (l *Logger) Log(v ...interface{}) {
-	fmt.Println(v...)
-}
-
-func (l *Logger) Logf(format string, v ...interface{}) {
-	fmt.Printf(format, v...)
+func (l *Logger) Logf(format string, v ...any) {
+	fmt.Printf(format+"\n", v...)
 }
 
 // Usage: go run ./examples/logger s3://example-bucket/path/to/source path/to/dest
