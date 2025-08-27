@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/seqsense/s3sync"
+	"github.com/seqsense/s3sync/v2"
 )
 
 // Usage: go run ./examples/statistics s3://example-bucket/path/to/source path/to/dest

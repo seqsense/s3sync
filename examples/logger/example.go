@@ -18,7 +18,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/seqsense/s3sync"
+	"github.com/seqsense/s3sync/v2"
 )
 
 type Logger struct {
