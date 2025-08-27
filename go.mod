@@ -1,4 +1,4 @@
-module github.com/seqsense/s3sync
+module github.com/seqsense/s3sync/v2
 
 go 1.23.0
 
@@ -11,9 +11,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.0
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.87.1
 	github.com/gabriel-vasile/mimetype v1.4.9
+	github.com/seqsense/s3sync v1.10.0
 )
 
 require (
+	github.com/aws/aws-sdk-go v1.53.19 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.4 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.4 // indirect
@@ -28,5 +30,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.33.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.0 // indirect
 	github.com/aws/smithy-go v1.22.5 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 )
