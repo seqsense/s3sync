@@ -14,7 +14,6 @@ package s3sync
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"sort"
 	"testing"
@@ -29,16 +28,16 @@ const awsRegion = "ap-northeast-1"
 
 func getSession() aws.Config {
 	return aws.Config{
-        Credentials: credentials.NewStaticCredentialsProvider("key", "secret", "token"),
-        Region:      awsRegion,
-        EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(
-            func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-                return aws.Endpoint{
-                    URL:               "http://localhost:4572",
-                    HostnameImmutable: true,
-                }, nil
-            }),
-    }
+		Credentials: credentials.NewStaticCredentialsProvider("key", "secret", "token"),
+		Region:      awsRegion,
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+				return aws.Endpoint{
+					URL:               "http://localhost:4572",
+					HostnameImmutable: true,
+				}, nil
+			}),
+	}
 }
 
 type s3Object struct {
@@ -107,7 +106,7 @@ func listObjectsSorted(t *testing.T, bucket string) []s3Object {
 }
 
 func fileHasSize(t *testing.T, filename string, expectedSize int) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		t.Error(filename, "is not synced")
 		return
