@@ -17,7 +17,6 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -39,7 +38,7 @@ func TestS3syncNotImplemented(t *testing.T) {
 }
 
 func TestS3sync(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
+	data, err := os.ReadFile(dummyFilename)
 	if err != nil {
 		t.Fatal("Failed to read", dummyFilename)
 	}
@@ -47,7 +46,7 @@ func TestS3sync(t *testing.T) {
 	dummyFileSize := len(data)
 
 	t.Run("Download", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -56,7 +55,7 @@ func TestS3sync(t *testing.T) {
 
 		destOnlyFilename := filepath.Join(temp, "dest_only_file")
 		const destOnlyFileSize = 10
-		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+		if err := os.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -88,7 +87,7 @@ func TestS3sync(t *testing.T) {
 		}
 	})
 	t.Run("DownloadSkipDirectory", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -100,7 +99,7 @@ func TestS3sync(t *testing.T) {
 		}
 	})
 	t.Run("DownloadSingleFile", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -109,7 +108,7 @@ func TestS3sync(t *testing.T) {
 
 		destOnlyFilename := filepath.Join(temp, "dest_only_file")
 		const destOnlyFileSize = 10
-		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+		if err := os.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -177,7 +176,7 @@ func TestS3sync(t *testing.T) {
 	})
 
 	t.Run("Upload", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -197,7 +196,7 @@ func TestS3sync(t *testing.T) {
 			filepath.Join(temp, "foo", dummyFilename),
 			filepath.Join(temp, "bar", "baz", dummyFilename),
 		} {
-			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+			if err := os.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
 			}
 		}
@@ -224,7 +223,7 @@ func TestS3sync(t *testing.T) {
 	})
 
 	t.Run("UploadEscaped", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		escapedFileName := fmt.Sprintf("SPACE %s", url.QueryEscape("READ%2FME.md"))
@@ -249,7 +248,7 @@ func TestS3sync(t *testing.T) {
 			filepath.Join(temp, "foo%2Fescape space", escapedFileName),
 			filepath.Join(temp, "bar", "baz%2Fescape space", escapedFileName),
 		} {
-			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+			if err := os.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
 			}
 		}
@@ -288,7 +287,7 @@ func TestS3sync(t *testing.T) {
 		}
 	})
 	t.Run("UploadSingleFile", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -296,7 +295,7 @@ func TestS3sync(t *testing.T) {
 		}
 
 		filePath := filepath.Join(temp, dummyFilename)
-		if err := ioutil.WriteFile(filePath, make([]byte, dummyFileSize), 0644); err != nil {
+		if err := os.WriteFile(filePath, make([]byte, dummyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -304,7 +303,7 @@ func TestS3sync(t *testing.T) {
 			t.Fatal("Failed to mkdir", err)
 		}
 		filePath2 := filepath.Join(temp, "foo", "test2.md")
-		if err := ioutil.WriteFile(filePath2, make([]byte, dummyFileSize), 0644); err != nil {
+		if err := os.WriteFile(filePath2, make([]byte, dummyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -347,7 +346,7 @@ func TestS3sync(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
+	data, err := os.ReadFile(dummyFilename)
 	if err != nil {
 		t.Fatal("Failed to read", dummyFilename)
 	}
@@ -355,7 +354,7 @@ func TestDelete(t *testing.T) {
 	dummyFileSize := len(data)
 
 	t.Run("DeleteLocal", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -364,7 +363,7 @@ func TestDelete(t *testing.T) {
 
 		destOnlyFilename := filepath.Join(temp, "dest_only_file")
 		const destOnlyFileSize = 10
-		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+		if err := os.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -395,7 +394,7 @@ func TestDelete(t *testing.T) {
 		}
 	})
 	t.Run("DeleteLocalSingleFile", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -404,7 +403,7 @@ func TestDelete(t *testing.T) {
 
 		destOnlyFilename := filepath.Join(temp, "dest_only_file")
 		const destOnlyFileSize = 10
-		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+		if err := os.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -430,7 +429,7 @@ func TestDelete(t *testing.T) {
 		}
 	})
 	t.Run("DeleteRemote", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -450,7 +449,7 @@ func TestDelete(t *testing.T) {
 			filepath.Join(temp, "foo", dummyFilename),
 			filepath.Join(temp, "bar", "baz", dummyFilename),
 		} {
-			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+			if err := os.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
 			}
 		}
@@ -485,7 +484,7 @@ func TestDelete(t *testing.T) {
 		}
 	})
 	t.Run("DeleteRemoteSingleFile", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -521,7 +520,7 @@ func TestDelete(t *testing.T) {
 }
 
 func TestDryRun(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
+	data, err := os.ReadFile(dummyFilename)
 	if err != nil {
 		t.Fatal("Failed to read", dummyFilename)
 	}
@@ -529,7 +528,7 @@ func TestDryRun(t *testing.T) {
 	dummyFileSize := len(data)
 
 	t.Run("Download", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -538,7 +537,7 @@ func TestDryRun(t *testing.T) {
 
 		destOnlyFilename := filepath.Join(temp, "dest_only_file")
 		const destOnlyFileSize = 10
-		if err := ioutil.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
+		if err := os.WriteFile(destOnlyFilename, make([]byte, destOnlyFileSize), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 
@@ -567,7 +566,7 @@ func TestDryRun(t *testing.T) {
 
 	})
 	t.Run("Upload", func(t *testing.T) {
-		temp, err := ioutil.TempDir("", "s3synctest")
+		temp, err := os.MkdirTemp("", "s3synctest")
 		defer os.RemoveAll(temp)
 
 		if err != nil {
@@ -587,7 +586,7 @@ func TestDryRun(t *testing.T) {
 			filepath.Join(temp, "foo", dummyFilename),
 			filepath.Join(temp, "bar", "baz", dummyFilename),
 		} {
-			if err := ioutil.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
+			if err := os.WriteFile(file, make([]byte, dummyFileSize), 0644); err != nil {
 				t.Fatal("Failed to write", err)
 			}
 		}
@@ -615,14 +614,14 @@ func TestDryRun(t *testing.T) {
 }
 
 func TestPartialS3sync(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
+	data, err := os.ReadFile(dummyFilename)
 	if err != nil {
 		t.Fatal("Failed to read", dummyFilename)
 	}
 
 	expectedFileSize := len(data)
 
-	temp, err := ioutil.TempDir("", "s3synctest")
+	temp, err := os.MkdirTemp("", "s3synctest")
 	defer os.RemoveAll(temp)
 
 	if err != nil {
@@ -732,7 +731,7 @@ func TestPartialS3sync(t *testing.T) {
 }
 
 func TestListLocalFiles(t *testing.T) {
-	temp, err := ioutil.TempDir("", "s3synctest")
+	temp, err := os.MkdirTemp("", "s3synctest")
 	defer os.RemoveAll(temp)
 
 	if err != nil {
@@ -754,7 +753,7 @@ func TestListLocalFiles(t *testing.T) {
 		filepath.Join(temp, "foo", "test2"),
 		filepath.Join(temp, "bar", "baz", "test3"),
 	} {
-		if err := ioutil.WriteFile(file, make([]byte, 10), 0644); err != nil {
+		if err := os.WriteFile(file, make([]byte, 10), 0644); err != nil {
 			t.Fatal("Failed to write", err)
 		}
 	}
@@ -820,12 +819,12 @@ func TestListLocalFiles(t *testing.T) {
 }
 
 func TestS3sync_GuessMime(t *testing.T) {
-	data, err := ioutil.ReadFile(dummyFilename)
+	data, err := os.ReadFile(dummyFilename)
 	if err != nil {
 		t.Fatal("Failed to read", dummyFilename)
 	}
 
-	temp, err := ioutil.TempDir("", "s3synctest")
+	temp, err := os.MkdirTemp("", "s3synctest")
 	defer os.RemoveAll(temp)
 
 	if err != nil {
@@ -838,7 +837,7 @@ func TestS3sync_GuessMime(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := ioutil.WriteFile(filepath.Join(temp, dummyFilename), buf.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(temp, dummyFilename), buf.Bytes(), 0644); err != nil {
 		t.Fatal("Failed to write", err)
 	}
 
