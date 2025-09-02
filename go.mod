@@ -10,7 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.10
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.19.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.87.3
-	github.com/gabriel-vasile/mimetype v1.4.9
+	github.com/gabriel-vasile/mimetype v1.4.10
 )
 
 require (
@@ -28,5 +28,4 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.34.2 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.38.2 // indirect
 	github.com/aws/smithy-go v1.23.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
 )
