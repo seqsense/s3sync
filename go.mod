@@ -2,8 +2,6 @@ module github.com/seqsense/s3sync/v2
 
 go 1.23.0
 
-toolchain go1.24.2
-
 require (
 	github.com/aws/aws-sdk-go-v2 v1.38.3
 	github.com/aws/aws-sdk-go-v2/config v1.31.6
