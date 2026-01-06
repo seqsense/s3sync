@@ -323,7 +323,6 @@ func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Pa
 		Key:    &sourceFile,
 	})
 	if err != nil {
-		logf("download error: %s", err)
 		return err
 	}
 	m.updateFileTransferStatistics(written)
