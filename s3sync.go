@@ -366,6 +366,7 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
+		// If source is a single file and destination is not a directory, use destination URL as is.
 		destFile.bucketPrefix = path.Join(destPath.bucketPrefix, file.name)
 	}
 
@@ -415,6 +416,7 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 func (m *Manager) deleteRemote(ctx context.Context, file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
+		// If source is a single file and destination is not a directory, use destination URL as is.
 		destFile.bucketPrefix = path.Join(destPath.bucketPrefix, file.name)
 	}
 
