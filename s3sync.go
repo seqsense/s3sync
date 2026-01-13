@@ -17,6 +17,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -253,8 +254,8 @@ func (m *Manager) syncS3ToLocal(ctx context.Context, chJob chan func(), sourcePa
 }
 
 func (m *Manager) copyS3ToS3(ctx context.Context, file *fileInfo, sourcePath *s3Path, destPath *s3Path) error {
-	copySource := filepath.ToSlash(filepath.Join(sourcePath.bucket, sourcePath.bucketPrefix, file.name))
-	destinationKey := filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
+	copySource := path.Join(sourcePath.bucket, sourcePath.bucketPrefix, file.name)
+	destinationKey := path.Join(destPath.bucketPrefix, file.name)
 	println("Copying from", copySource, "to key", destinationKey, "in bucket", destPath.bucket)
 	if m.dryrun {
 		return nil
@@ -305,8 +306,7 @@ func (m *Manager) download(file *fileInfo, sourcePath *s3Path, destPath string) 
 	if file.singleFile {
 		sourceFile = file.name
 	} else {
-		// Using filepath.ToSlash for change backslash to slash on Windows
-		sourceFile = filepath.ToSlash(filepath.Join(sourcePath.bucketPrefix, file.name))
+		sourceFile = path.Join(sourcePath.bucketPrefix, file.name)
 	}
 
 	c := s3manager.NewDownloaderWithClient(m.s3, m.downloaderOpts...)
@@ -358,8 +358,7 @@ func (m *Manager) upload(file *fileInfo, sourcePath string, destPath *s3Path) er
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
-		// Using filepath.ToSlash for change backslash to slash on Windows
-		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
+		destFile.bucketPrefix = path.Join(destPath.bucketPrefix, file.name)
 	}
 
 	println("Uploading", file.name, "to", destFile.String())
@@ -408,8 +407,7 @@ func (m *Manager) deleteRemote(file *fileInfo, destPath *s3Path) error {
 	destFile := *destPath
 	if strings.HasSuffix(destPath.bucketPrefix, "/") || destPath.bucketPrefix == "" || !file.singleFile {
 		// If source is a single file and destination is not a directory, use destination URL as is.
-		// Using filepath.ToSlash for change backslash to slash on Windows
-		destFile.bucketPrefix = filepath.ToSlash(filepath.Join(destPath.bucketPrefix, file.name))
+		destFile.bucketPrefix = path.Join(destPath.bucketPrefix, file.name)
 	}
 
 	println("Deleting", destFile.String())
@@ -462,13 +460,12 @@ func (m *Manager) listS3FileWithToken(ctx context.Context, c chan *fileInfo, pat
 			// Skip directory like object
 			continue
 		}
-		name, err := filepath.Rel(path.bucketPrefix, *object.Key)
-		if err != nil {
-			sendErrorInfoToChannel(ctx, c, err)
-			continue
-		}
+
+		name := strings.TrimPrefix(*object.Key, path.bucketPrefix)
+		name = strings.TrimPrefix(name, "/")
+
 		var fi *fileInfo
-		if name == "." {
+		if name == "" || name == "." {
 			// Single file was specified
 			fi = &fileInfo{
 				name:         filepath.Base(*object.Key),
