@@ -14,7 +14,7 @@
 package s3sync
 
 import (
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
@@ -70,14 +70,14 @@ func WithContentType(mime string) Option {
 }
 
 // WithDownloaderOptions sets underlying s3 manager's options.
-func WithDownloaderOptions(opts ...func(*manager.Downloader)) Option {
+func WithDownloaderOptions(opts ...func(*transfermanager.Options)) Option {
 	return func(m *Manager) {
 		m.downloaderOpts = opts
 	}
 }
 
 // WithUploaderOptions sets underlying s3 manager's options.
-func WithUploaderOptions(opts ...func(*manager.Uploader)) Option {
+func WithUploaderOptions(opts ...func(*transfermanager.Options)) Option {
 	return func(m *Manager) {
 		m.uploaderOpts = opts
 	}

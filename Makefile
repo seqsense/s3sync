@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-LOCALSTACK_VERSION = 4.12.0
+FLOCI_VERSION = 1.1.0
 
 .PHONY: test
 test:
@@ -24,11 +24,11 @@ cover:
 
 .PHONY: s3
 s3:
-	docker run -p 4572:4566 -e SERVICES=s3 localstack/localstack:$(LOCALSTACK_VERSION)
+	docker run --rm --user root -p 4572:4566 hectorvent/floci:$(FLOCI_VERSION)
 
 .PHONY: s3-bg
 s3-bg:
-	docker run -d -p 4572:4566 -e SERVICES=s3 localstack/localstack:$(LOCALSTACK_VERSION)
+	docker run --rm --user root -d -p 4572:4566 hectorvent/floci:$(FLOCI_VERSION)
 
 .PHONY: fixture
 fixture:
