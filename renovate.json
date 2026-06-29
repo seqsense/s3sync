@@ -10,10 +10,10 @@
         "/^Makefile$/"
       ],
       "matchStrings": [
-        "LOCALSTACK_VERSION\\s*=\\s*(?<currentValue>.*)"
+        "FLOCI_VERSION\\s*=\\s*(?<currentValue>.*)"
       ],
       "datasourceTemplate": "docker",
-      "depNameTemplate": "localstack/localstack",
+      "depNameTemplate": "floci/floci",
       "versioningTemplate": "docker"
     }
   ],
