@@ -7,7 +7,7 @@ on:
 
 env:
   # These dummy credentials are necessary for running tests against
-  # localstack s3 service
+  # floci s3 service
   AWS_ACCESS_KEY_ID: foo
   AWS_SECRET_ACCESS_KEY: bar
 jobs:
@@ -31,8 +31,7 @@ jobs:
         run: |
           # Start mock s3 service
           make s3-bg
-          while ! curl http://localhost:4572; do sleep 1; done
-          sleep 5
+          sleep 1
           # Set up fixture S3 files
           make fixture
           make cover # run test with coverage
