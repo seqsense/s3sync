@@ -1,0 +1,10 @@
+services:
+  floci:
+    image: floci/floci:1.5.28-compat
+    volumes:
+      - "./s3/start.d:/etc/floci/init/start.d"
+      - "./s3/fixture:/fixture"
+    environment:
+      AWS_DEFAULT_REGION: ap-northeast-1
+    ports:
+      - "4572:4566"
