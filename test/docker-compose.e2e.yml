@@ -1,6 +1,6 @@
 services:
   floci:
-    image: floci/floci:1.5.28-compat
+    image: floci/floci:1.5.30-compat
     volumes:
       - "./s3/start.d:/etc/floci/init/start.d"
       - "./s3/fixture:/fixture"
