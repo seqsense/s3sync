@@ -22,12 +22,12 @@ cover:
 
 .PHONY: s3
 s3:
-	docker compose -f ./test/docker-compose.e2e.yml up
+	docker compose -f ./docker-compose.e2e.yml up
 
 .PHONY: s3-bg
 s3-bg:
-	docker compose -f ./test/docker-compose.e2e.yml up -d --wait
+	docker compose -f ./docker-compose.e2e.yml up -d --wait
 
 .PHONY: s3-down
 s3-down:
-	docker compose -f ./test/docker-compose.e2e.yml down
+	docker compose -f ./docker-compose.e2e.yml down
