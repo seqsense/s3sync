@@ -11,7 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FLOCI_VERSION = 1.5.28
+FLOCI_VERSION = 1.5.30
 
 .PHONY: test
 test:
