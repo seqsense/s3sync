@@ -11,8 +11,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FLOCI_VERSION = 1.5.30
-
 .PHONY: test
 test:
 	go test . -v
@@ -24,35 +22,12 @@ cover:
 
 .PHONY: s3
 s3:
-	docker run -p 4572:4566 -e SERVICES=s3 floci/floci:$(FLOCI_VERSION)
+	docker compose -f ./docker-compose.e2e.yml up
 
 .PHONY: s3-bg
 s3-bg:
-	docker run -d -p 4572:4566 -e SERVICES=s3 floci/floci:$(FLOCI_VERSION)
+	docker compose -f ./docker-compose.e2e.yml up -d --wait
 
-.PHONY: fixture
-fixture:
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket/foo/
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket/bar/baz/
-	aws s3 --endpoint-url http://localhost:4572 mb s3://s3-source
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://s3-source
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://s3-source/foo/
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://s3-source/bar/baz/
-	aws s3 --endpoint-url http://localhost:4572 mb s3://s3-destination
-	aws s3 --endpoint-url http://localhost:4572 mb s3://s3-destination2
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-escaped
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-upload/dest_only_file
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-upload-file
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-delete
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-delete/dest_only_file
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-delete-file
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-delete-file
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-delete-file/dest_only_file
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-dryrun
-	aws s3 --endpoint-url http://localhost:4572 cp README.md s3://example-bucket-dryrun/dest_only_file
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-directory
-	aws s3 --endpoint-url http://localhost:4572 mb s3://example-bucket-mime
-	aws s3api --endpoint-url http://localhost:4572 put-object --bucket example-bucket-directory --key test/
+.PHONY: s3-down
+s3-down:
+	docker compose -f ./docker-compose.e2e.yml down

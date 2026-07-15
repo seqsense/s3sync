@@ -1,0 +1,13 @@
+services:
+  floci:
+    image: floci/floci:1.5.32-compat
+    volumes:
+      - "./test/s3/start.d:/etc/floci/init/start.d"
+      - "./README.md:/fixture/README.md"
+    ports:
+      - "4572:4566"
+    healthcheck:
+      test: "curl -f http://localhost:4566/_floci/health && test -f /tmp/START_SCRIPTS_DONE || exit 1"
+      interval: 2s
+      timeout: 1s
+      retries: 15

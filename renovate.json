@@ -3,20 +3,6 @@
     "config:recommended",
     "schedule:weekends"
   ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "managerFilePatterns": [
-        "/^Makefile$/"
-      ],
-      "matchStrings": [
-        "FLOCI_VERSION\\s*=\\s*(?<currentValue>.*)"
-      ],
-      "datasourceTemplate": "docker",
-      "depNameTemplate": "floci/floci",
-      "versioningTemplate": "docker"
-    }
-  ],
   "postUpdateOptions": [
     "gomodTidy"
   ],

@@ -31,9 +31,6 @@ jobs:
         run: |
           # Start mock s3 service
           make s3-bg
-          sleep 1
-          # Set up fixture S3 files
-          make fixture
           make cover # run test with coverage
         env:
           AWS_REGION: ap-northeast-1 # for awscli
