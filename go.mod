@@ -1,4 +1,4 @@
-module github.com/seqsense/s3sync/v2
+module github.com/seqsense/s3sync/v3
 
 go 1.24
 
