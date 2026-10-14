@@ -18,7 +18,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
 )
 
 func TestWithParallel(t *testing.T) {
@@ -58,7 +58,7 @@ func TestUploaderDownloaderOptions(t *testing.T) {
 	}
 	t.Run("Uploader", func(t *testing.T) {
 		m := New(cfg, WithUploaderOptions(
-			func(u *manager.Uploader) {},
+			func(u *transfermanager.Options) {},
 		))
 		if len(m.uploaderOpts) != 1 {
 			t.Fatal("Manager.uploaderOpts must have a option")
@@ -66,7 +66,7 @@ func TestUploaderDownloaderOptions(t *testing.T) {
 	})
 	t.Run("Downloader", func(t *testing.T) {
 		m := New(cfg, WithDownloaderOptions(
-			func(d *manager.Downloader) {},
+			func(d *transfermanager.Options) {},
 		))
 		if len(m.downloaderOpts) != 1 {
 			t.Fatal("Manager.downloaderOpts must have a option")
