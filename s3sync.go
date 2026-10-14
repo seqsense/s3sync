@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager"
+	tmtypes "github.com/aws/aws-sdk-go-v2/feature/s3/transfermanager/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/gabriel-vasile/mimetype"
@@ -32,8 +33,7 @@ import (
 
 // s3API defines the subset of s3.Client methods used by Manager, for testability.
 type s3API interface {
-	manager.DownloadAPIClient
-	manager.UploadAPIClient
+	transfermanager.S3APIClient
 	CopyObject(ctx context.Context, params *s3.CopyObjectInput, optFns ...func(*s3.Options)) (*s3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *s3.DeleteObjectInput, optFns ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	ListObjectsV2(ctx context.Context, params *s3.ListObjectsV2Input, optFns ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
@@ -50,8 +50,8 @@ type Manager struct {
 	acl            types.ObjectCannedACL
 	guessMime      bool
 	contentType    *string
-	downloaderOpts []func(*manager.Downloader)
-	uploaderOpts   []func(*manager.Uploader)
+	downloaderOpts []func(*transfermanager.Options)
+	uploaderOpts   []func(*transfermanager.Options)
 	statistics     SyncStatistics
 }
 
@@ -317,15 +317,16 @@ func (m *Manager) download(ctx context.Context, file *fileInfo, sourcePath *s3Pa
 		sourceFile = path.Join(sourcePath.bucketPrefix, file.name)
 	}
 
-	c := manager.NewDownloader(m.s3, m.downloaderOpts...)
-	written, err := c.Download(ctx, writer, &s3.GetObjectInput{
-		Bucket: &sourcePath.bucket,
-		Key:    &sourceFile,
+	c := transfermanager.New(m.s3, m.downloaderOpts...)
+	out, err := c.DownloadObject(ctx, &transfermanager.DownloadObjectInput{
+		Bucket:   &sourcePath.bucket,
+		Key:      &sourceFile,
+		WriterAt: writer,
 	})
 	if err != nil {
 		return err
 	}
-	m.updateFileTransferStatistics(written)
+	m.updateFileTransferStatistics(aws.ToInt64(out.ContentLength))
 	err = os.Chtimes(targetFilename, file.lastModified, file.lastModified)
 	if err != nil {
 		return err
@@ -396,13 +397,13 @@ func (m *Manager) upload(ctx context.Context, file *fileInfo, sourcePath string,
 
 	defer reader.Close()
 
-	_, err = manager.NewUploader(
+	_, err = transfermanager.New(
 		m.s3,
 		m.uploaderOpts...,
-	).Upload(ctx, &s3.PutObjectInput{
+	).UploadObject(ctx, &transfermanager.UploadObjectInput{
 		Bucket:      &destFile.bucket,
 		Key:         &destFile.bucketPrefix,
-		ACL:         m.acl,
+		ACL:         tmtypes.ObjectCannedACL(m.acl),
 		Body:        reader,
 		ContentType: contentType,
 	})
