@@ -7,8 +7,8 @@
 
 ## Migration guide
 
-- [v2](MIGRATION.md#v2)
 - [v3](MIGRATION.md#v3)
+- [v2](MIGRATION.md#v2)
 
 # Usage
 
