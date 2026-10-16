@@ -7,6 +7,7 @@
 
 ## Migration guide
 
+- [v3](MIGRATION.md#v3)
 - [v2](MIGRATION.md#v2)
 
 # Usage
@@ -16,7 +17,7 @@ Use `New` to create a manager, and `Sync` function syncs between s3 and local fi
 ```go
 import (
   "github.com/aws/aws-sdk-go-v2/config"
-  "github.com/seqsense/s3sync/v2"
+  "github.com/seqsense/s3sync/v3"
 )
 
 func main() {
@@ -46,7 +47,7 @@ func main() {
 You can set your custom logger.
 
 ```go
-import "github.com/seqsense/s3sync/v2"
+import "github.com/seqsense/s3sync/v3"
 
 ...
 s3sync.SetLogger(&CustomLogger{})
